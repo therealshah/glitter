@@ -1,0 +1,34 @@
+<!DOCTYPE>
+<html>
+	<title>
+		homepage of the user
+	</title>
+<body>
+	 Welcome {{username}}!
+
+	 <!-- This is shows the tweet bar and tweet button -->
+	 <form method = "POST">
+	 	<input type="text" name="tweet"/>
+	 	<button type="submit" name="submit" value="tweet">Tweet!</button>
+
+	 </form>
+
+	 <!-- We need a logout button -->
+	 <form method = "POST">
+	 	<button type = 'submit' name='submit' value='logout'> Log out</button>
+	 </form>
+    {% for message in messages %}
+    	{{message}}
+    	<br / >
+    {% endfor %}
+   
+
+
+	 
+</body>
+
+
+
+
+
+</html>

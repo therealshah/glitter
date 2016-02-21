@@ -1,0 +1,26 @@
+<!doctype>
+<html>
+<head>
+	<title> Login Page for the social Media site </title>
+
+</head>
+<body>
+	<h1> Log in</h1>
+
+	<!-- This is used to get the data to create the accounts for the user-->
+	<form method = "POST">
+		<input type = "text" placeholder = "Enter your username" name = "user_name"/>
+		<input type = "text" placeholder = "Enter your password" name="password" />
+		<input type = "submit" name = "submit" value="log_in"></form>
+	</form>
+
+	<!-- This is the form used to create the page -->
+	<form method = "POST">
+		<button type="submit" name="submit" value="create_account"> Don't have a account yet? </button>
+	</form>
+
+	{{responsetext}}
+
+
+</body>
+</html>

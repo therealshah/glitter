@@ -4,8 +4,8 @@
 
     <!-- This is shows the search bar and search button -->
 	 <form method = "POST">
-	 	<input type="text" name="userid"/>
-	 	<button type="submit" name="submit" value="tweet">Search!</button>
+	 	<input type="text" name="search"/>
+	 	<button type="submit" name="submit" value="search">Search!</button>
 
 	 </form>
 
@@ -41,6 +41,17 @@
 	 			</div>
 
 	 		</form>
+	 	<br />
+	 {% endfor %}
+
+	 <br />
+	 <h1> Tweets! </h1>
+	 {% for key,value in tweets %}
+	 		<!-- We will create a form for every user that came up -->
+	 			<div>
+	 				<p>  {{key}} </p>
+	 				<p> {{value}} </p>
+	 			</div>
 	 	<br />
 	 {% endfor %}
 

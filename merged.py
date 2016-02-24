@@ -234,7 +234,9 @@ def homePage():
     elif request.form['submit'] == 'search':
       # If it's a search request, we will want to show what the user was searching for
       userinput = request.form['search']
-      return redirect(url_for('search',userinput = userinput))
+      print 'testing ' + userinput
+      if userinput:
+        return redirect(url_for('search',userinput = userinput))
      
 
 
@@ -247,6 +249,8 @@ def search(userinput):
       # Get all the friends that match up with this name
       # Get all the potential friends that match up with the search request
       if request.method == 'POST':
+        if request.form['submit'] == 'search':
+          userinput = request.form['search']
         if request.form['submit'] == 'follow':
           #   #want to follow this dude
           # print 'IN IF STATEMENT'
@@ -262,9 +266,12 @@ def search(userinput):
       potentialFriends = [] # find all friends that match up with this name
       tweets = [] # get all the tweets that match with this search
       myFriends = [] # find all of my friends that match with this name
-      findPotentialFriends(potentialFriends,userinput)
-      findTweets(tweets,userinput)
-      myFriends = findMyFriends()
+      # if the input isnt empty
+      if userinput.strip("/"):
+        print "printing user inpit " + userinput
+        findPotentialFriends(potentialFriends,userinput)
+        findTweets(tweets,userinput)
+        myFriends = findMyFriends()
       #print 'Printing user input ' + userinput
       return render_template("search.html", potentialFriends = potentialFriends, tweets = tweets, myFriends = myFriends)
 
@@ -283,7 +290,23 @@ def findPotentialFriends(potentialFriends,userinput):
  
 
 def findTweets(tweets,userinput):
-  print 'FINDing tweets'
+  # if it's a friend, find all the tweets of this person
+  friendList = userFriends[session['userName']] 
+  if userinput in friendList: # checking if this search is a friend
+    #if yes, get all the tweets of this person
+    friendTweets = userTweets[userinput]
+    for tweet in friendTweets:
+      tweets.append((userinput,tweet))# add this tweet to the tweet list
+
+  #also check if any of my friends tweets matched the search
+  for friend in friendList:
+    friendTweets = userTweets[friend]
+    for tweet in friendTweets:
+      if userinput in tweet: # if the search is in this tweet
+        tweets.append((userinput,tweet)) # add this tweet to the tweet list 
+  print "printing all tweets "
+  print (tweets)
+
 
 def findMyFriends():
   # find all of my friends and store them in the list

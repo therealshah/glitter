@@ -147,6 +147,7 @@ def checkCredentials(userName,typedPass):
 		return False
 
 
+@app.route('logout/' )
 #log the user out
 def logout():
 	global listStuff

@@ -4,7 +4,16 @@
 		homepage of the user
 	</title>
 <body>
+	{% extends "base.html" %}
+	{% block content %}
 	 Welcome {{username}}!
+
+	 <!-- This method basically allows the user to search for tweets, friends,  -->
+	 <form method = "POST">
+	 	<input type="text" name="search"/>
+	 	<button type="submit" name="submit" value="search">Search!</button>
+
+	 </form>
 
 	 <!-- This is shows the tweet bar and tweet button -->
 	 <form method = "POST">
@@ -13,10 +22,6 @@
 
 	 </form>
 
-	 <!-- We need a logout button -->
-	 <form method = "POST">
-	 	<button type = 'submit' name='submit' value='logout'> Log out</button>
-	 </form>
     {% for message in messages %}
     	{{message}}
     	<br / >
@@ -24,6 +29,8 @@
    
 
 
+
+{% endblock %}
 	 
 </body>
 
@@ -32,3 +39,6 @@
 
 
 </html>
+
+
+

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Hi, {{ user }}!</h1>
+    <p> Your Friends Are: </p>
+    {% for friend in friends %}
+    <div>
+    	<p>   {{friend}} </p>
+    </div>
+    {% endfor %}
+
+     <form method = "POST">
+        <input type="text" name="userid"/>
+        <button type="submit" name="submit" value="friend">AddFriend!</button>
+     </form>
+
+{% endblock %}

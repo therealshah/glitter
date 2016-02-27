@@ -1,5 +1,2 @@
-shahzaib:shah:shahzaib10
+shah:shahzaib:shahzaib10
 matt:matt:matt
-matt:test:test
-saqib:yolo:yolo
-saqib:yolo2:yolo2

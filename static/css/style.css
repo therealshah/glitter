@@ -1,0 +1,40 @@
+body {
+	max-width: 800 px;
+	margin-left: auto;
+	margin-right: auto;
+	background-color: teal;
+}
+
+.container {
+ 	width: 80%;
+ 	min-width: 400px;
+ 	padding: 2em 0em 2em 0em;
+ 	text-align: center;
+ 	margin-left: auto;
+	margin-right: auto;
+	background-color: white;
+
+}
+
+.potentialFriends{
+	float: left;
+	width: 30%;
+}
+
+.myFriends{
+	float: right;
+	width: 30%;
+}
+
+/*.displayTweets{
+	float: center;
+	width: 70%;
+	
+
+}
+*/
+
+.error{
+  color: red;
+}
+

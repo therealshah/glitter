@@ -1,18 +1,20 @@
 <html>
   <head>
-    {% if title %}
-    <title>{{ title }} - microblog</title>
-    {% else %}
-    <title>Welcome to microblog</title>
-    {% endif %}
+    {% block head %}
+    <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/style.css') }}">    
+    <title>{% block title %}{% endblock %} Glitter</title>
+    {% endblock %}
   </head>
   <body>
-    <div>Microblog: 
+    <div class="container">
+    <div> Glitter: 
       <a href="/">Home</a>
       <a href="/logout/">Logout</a>
+      <a href="/delete">Delete Account</a>
 
     </div>
     <hr>
     {% block content %}{% endblock %}
+      <div>
   </body>
 </html>

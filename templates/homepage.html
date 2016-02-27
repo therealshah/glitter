@@ -3,41 +3,29 @@
 	<title>
 		homepage of the user
 	</title>
-<body>
-	{% extends "base.html" %}
-	{% block content %}
-	 Welcome {{username}}!
+	<body>
+		{% extends "base.html" %}
+		{% block content %}
+			<h4>Welcome {{username}}!</h4>
+			 <!-- This method basically allows the user to search for tweets, friends,  -->
+			 <form method = "POST">
+			 	<input type="text" name="search"/>
+			 	<button type="submit" name="submit" value="search">Search!</button>
+			 </form>
 
-	 <!-- This method basically allows the user to search for tweets, friends,  -->
-	 <form method = "POST">
-	 	<input type="text" name="search"/>
-	 	<button type="submit" name="submit" value="search">Search!</button>
+			 <!-- This is shows the tweet bar and tweet button -->
+			 <form method = "POST">
+			 	<input type="text" name="tweet"/>
+			 	<button type="submit" name="submit" value="tweet">Tweet!</button>
+			 </form>
 
-	 </form>
+			<h4>Your Recent Tweets:</h4>
+		    {% for message in messages %}
+		    	<p>{{message}}</p>
+		    {% endfor %}
 
-	 <!-- This is shows the tweet bar and tweet button -->
-	 <form method = "POST">
-	 	<input type="text" name="tweet"/>
-	 	<button type="submit" name="submit" value="tweet">Tweet!</button>
-
-	 </form>
-
-    {% for message in messages %}
-    	{{message}}
-    	<br / >
-    {% endfor %}
-   
-
-
-
-{% endblock %}
-	 
-</body>
-
-
-
-
-
+		{% endblock %}	 
+	</body>
 </html>
 
 

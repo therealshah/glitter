@@ -1,65 +1,79 @@
-{% extends "base.html" %}
-{% block content %}
-    <h1>Hi, {{ user }}!</h1>
+<!DOCTYPE>
+<html>
+	<body>
 
-    <!-- This is shows the search bar and search button -->
-	 <form method = "POST">
-	 	<input type="text" name="search"/>
-	 	<button type="submit" name="submit" value="search">Search!</button>
+		{% extends "base.html" %}
+		{% block content %}
+		 <div>
+		    <h1>Search Results:</h1>
 
-	 </form>
+		    <!-- This is shows the search bar and search button -->
+			 <form method = "POST">
+			 	<input type="text" name="search"/>
+			 	<button type="submit" name="submit" value="search">Search!</button>
 
-	 <!-- This is shows the tweet bar and tweet button -->
-<!-- 	 <form method = "POST">
-	 	<input type="text" name="tweet"/>
-	 	<button type="submit" name="submit" value="tweet">Tweet!</button>
+			 </form>
 
-	 </form> -->
+			
+			 <div class = "potentialFriends">
+			 <fieldset>
+			 <legend> Search for Friends!</legend>
+					 {% for key,value in potentialFriends %}
+					 		<!-- We will create a form for every user that came up -->
+					 		<form method = "POST">
+					 			<div>
+					 				<label> 
+					 					Name:{{value}}
+					 					UserId: {{value}}  
+					 				</label>
+					 				<button type = "submit" name="submit" value = "follow">Follow!</button> </p>
+					 				<input type = "hidden" name = "hidden" value = {{key}}/>
+					 			</div>
 
-	 {% for key,value in potentialFriends %}
-	 		<!-- We will create a form for every user that came up -->
-	 		<form method = "POST">
-	 			<div>
-	 				<p> name:{{value}}  username:{{key}} </p>
-	 				<button type = "submit" name="submit" value = "follow">Follow!</button> 
-	 				<input type = "hidden" name = "hidden" value = {{key}}/>
-	 			</div>
+					 		</form>
+					 	<br />
+					 {% endfor %}
+				 </div>
+			</fieldset>
+			<!-- This displays all of my friends -->
+			<div class = "myFriends">
+			<fieldset>
+			<legend> Friend list </legend>
+				 {% for value in myFriends %}
+				 		<!-- We will create a form for every user that came up -->
+				 		<form method = "POST">
+				 			<div>
+				 				<p>  Username: {{value}} </p>
+				 				<button type = "submit" name="submit" value = "unfollow">Unfollow!</button> 
+				 				<input type = "hidden" name = "hidden" value = {{value}}/>
+				 			</div>
 
-	 		</form>
-	 	<br />
-	 {% endfor %}
+				 		</form>
+				 	<br />
+				 {% endfor %}
+			</fieldset>
+			</div>
+			<!-- This will display all the tweets-->
+			<div class = "displayTweets">
+				<fieldset>
+					<legend>Tweets!</legend>
+					 {% for key,value in tweets %}
+					 		<!-- We will create a form for every user that came up -->
+					 			<div>
+					 				<p>  {{key}} </p>
+					 				<p> {{value}} </p>
+					 			</div>
+					 	<br />
+					 {% endfor %}
 
-	 <br />
-	 <h1> My Friends </h1>
-	 {% for value in myFriends %}
-	 		<!-- We will create a form for every user that came up -->
-	 		<form method = "POST">
-	 			<div>
-	 				<p>  username:{{value}} </p>
-	 				<button type = "submit" name="submit" value = "unfollow">Unfollow!</button> 
-	 				<input type = "hidden" name = "hidden" value = {{value}}/>
-	 			</div>
+				    {% for friendtweet in friendtweets %}
+				    <div><p>{{ friend }} says: <b>{{ friendtweet }}</b></p></div>
+				    {% endfor %}
 
-	 		</form>
-	 	<br />
-	 {% endfor %}
+			    </fieldset>
+		    </div>
+		
 
-	 <br />
-	 <h1> Tweets! </h1>
-	 {% for key,value in tweets %}
-	 		<!-- We will create a form for every user that came up -->
-	 			<div>
-	 				<p>  {{key}} </p>
-	 				<p> {{value}} </p>
-	 			</div>
-	 	<br />
-	 {% endfor %}
-
-
-
-
-    {% for friendtweet in friendtweets %}
-    <div><p>{{ friend }} says: <b>{{ friendtweet }}</b></p></div>
-    {% endfor %}
-
-{% endblock %}
+		{% endblock %}
+	</body>
+</html>

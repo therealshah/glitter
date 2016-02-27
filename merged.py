@@ -39,7 +39,7 @@ def login_page():
   # If the user sends back a request( either log in or create a new account)
   if request.method == 'POST':
     # ck which type of response it was
-    if request.form["submit"] == "log_in": # user is trying to log into his/her account
+    if request.form["submit"] == "Sign In": # user is trying to log into his/her account
       print request.form["user_name"] #print to the console for debugging purposes
       userName = request.form["user_name"]
       password = (request.form["password"])
@@ -76,6 +76,8 @@ def create():
       print "Key successfully created! "
       writeKey(users,name,userName,password) # write the key to the dictionary and to the file
       session['userName'] = userName
+      # listStuff.insert(0,"")
+      # followFriend("") 
       return redirect(url_for("login_page"))
 
   return render_template("create.html")
@@ -217,9 +219,18 @@ def logout():
 # This is the main homepage that allows for all the features discussed above
 @app.route('/homepage/', methods = ['post','get'])
 def homePage():
+  #Check if the user is logged in. If not, redirect.
+  try:
+    session['userName']
+  except KeyError:
+    print("Redirect, Not Logged In")
+    return redirect(url_for('login_page'))
 
-  # if we made it here, then we have a user already logged in. So get that user
+  # if we made it here, then we have a user already logged in. So get that user 
   username = session['userName'] # get the username from the cache
+
+
+
   listStuff = userTweets[username] #get this users tweets
 
   # if the user is trying to log out, then log out
@@ -245,35 +256,44 @@ def homePage():
 
 @app.route('/search/<userinput>', methods = ['post','get'])
 def search(userinput):
-      # Get all the tweets of this person if they are a friend
-      # Get all the friends that match up with this name
-      # Get all the potential friends that match up with the search request
-      if request.method == 'POST':
-        if request.form['submit'] == 'search':
-          userinput = request.form['search']
-        if request.form['submit'] == 'follow':
-          #   #want to follow this dude
-          # print 'IN IF STATEMENT'
-          friend = request.form['hidden']           
-          print " printing friend " + friend 
-          followFriend(friend) # follow the friend
-        elif request.form['submit'] == 'unfollow': # unfollow the person
-          friend = request.form['hidden'] # friend to unfollow
-          unFollowFriend(friend)
+  #Check if the user is logged in. If not, redirect.
+  try:
+    session['userName']
+  except KeyError:
+    print("Redirect, Not Logged In")
+    return redirect(url_for('login_page'))
+
+  # Get all the tweets of this person if they are a friend
+  # Get all the friends that match up with this name
+  # Get all the potential friends that match up with the search request
+  if request.method == 'POST':
+    if request.form['submit'] == 'search':
+      userinput = request.form['search']
+    if request.form['submit'] == 'follow':
+      #   #want to follow this dude
+      # print 'IN IF STATEMENT'
+      friend = request.form['hidden']           
+      print " printing friend " + friend 
+      followFriend(friend) # follow the friend
+    elif request.form['submit'] == 'unfollow': # unfollow the person
+      friend = request.form['hidden'] # friend to unfollow
+      unFollowFriend(friend)
 
 
-      
-      potentialFriends = [] # find all friends that match up with this name
-      tweets = [] # get all the tweets that match with this search
-      myFriends = [] # find all of my friends that match with this name
-      # if the input isnt empty
-      if userinput.strip("/"):
-        print "printing user inpit " + userinput
-        findPotentialFriends(potentialFriends,userinput)
-        findTweets(tweets,userinput)
-        myFriends = findMyFriends()
-      #print 'Printing user input ' + userinput
-      return render_template("search.html", potentialFriends = potentialFriends, tweets = tweets, myFriends = myFriends)
+  
+  potentialFriends = [] # find all friends that match up with this name
+  tweets = [] # get all the tweets that match with this search
+  myFriends = [] # find all of my friends that match with this name
+  # if the input isnt empty
+  if userinput.strip("/"):
+    print "printing user inpit " + userinput
+    findPotentialFriends(potentialFriends,userinput)
+    findTweets(tweets,userinput)
+    myFriends = findMyFriends()
+  #print 'Printing user input ' + userinput
+  print 'Printing all of my friends  '
+  print (tweets)
+  return render_template("search.html", potentialFriends = potentialFriends, tweets = tweets, myFriends = myFriends)
 
 
 # Finds all the friends based on the name provided
@@ -291,18 +311,23 @@ def findPotentialFriends(potentialFriends,userinput):
 
 def findTweets(tweets,userinput):
   # if it's a friend, find all the tweets of this person
-  friendList = userFriends[session['userName']] 
+  friendList = findMyFriends()
   if userinput in friendList: # checking if this search is a friend
     #if yes, get all the tweets of this person
     friendTweets = userTweets[userinput]
     for tweet in friendTweets:
       tweets.append((userinput,tweet))# add this tweet to the tweet list
 
+  print "printing friends "
+  print (friendList)
   #also check if any of my friends tweets matched the search
   for friend in friendList:
+    try:
+      userTweets[friend]
+    except:
+      break
     friendTweets = userTweets[friend]
     for tweet in friendTweets:
-      if userinput in tweet: # if the search is in this tweet
         tweets.append((userinput,tweet)) # add this tweet to the tweet list 
   print "printing all tweets "
   print (tweets)
@@ -331,6 +356,50 @@ def unFollowFriend(friend):
   friendList = userFriends[username] # get all of my friends
   friendList.remove(friend.strip("/")) #remove this friend. The html sends an extra / over
 
+def checkLogIn():
+  #Check if the user is logged in. If not, redirect.
+  try:
+    session['userName']
+  except KeyError:
+    print("Redirect, Not Logged In")
+    return redirect(url_for('login_page'))
+
+@app.route('/delete', methods = ['post','get'])
+def deleteAccount():
+  global users
+  #Check if the user is logged in. If not, redirect.
+  try:
+    session['userName']
+  except KeyError:
+    print("Redirect, Not Logged In")
+    return redirect(url_for('login_page'))
+
+  username = session['userName']
+  userTweets.pop(username, None)
+  users.pop(username, None)
+  listStuff = []
+  userFriends.pop(username, None)
+
+  # also find all the people that were following me and delete myself from the list
+  for User,friendList in userFriends.iteritems():
+    friendList.remove(username) # remove this guy from everyones list
+
+
+  file = open("users.txt",'w') # we will overwrite the existing file with the new one
+  # loop through the list
+  for key,user in users.iteritems():
+    #write the userId
+    file.write(key +":" + user[0] + ":" + user[1] + "\n");
+    #now loop through all the tweets and write them to the file
+    # for user,password in users:
+    #   file.write(":" + user + ":" + password) 
+    # file.write("\n") #write the new line character for the next user
+
+  file.close() #close the file
+  return redirect(url_for('logout'))
+
+
+
 
 @app.route('/force')
 def force():
@@ -338,63 +407,7 @@ def force():
   listStuff[:] = [] # clears the list
 
   return redirect(url_for('login_page')) # redirect the user to the log in page
-@app.route('/search2', methods = ['post','get'])
-def search2():
-    # from __init__ import APP_STATIC
-    # with open(os.path.join(APP_STATIC, 'text.txt')) as f: 
-    #     text = f.read()
-    theusername = session['userName']
 
-    if request.method=='POST':
-      person = request.form['userid']
-    else:
-      person = '' #orignally there is no friend being searched
-
-    if person == '':
-      return render_template("search.html",
-                            title='Home',
-                            user=theusername)
-    else: 
-      persontweets = userTweets[person] # find the friends tweet
-      # need a fail safe 
-
-      return render_template("search.html",
-                              title='Home',
-                              user=theusername,
-                              friend=person,
-                              friendtweets=persontweets)
-
-@app.route("/forms")
-def someFunc():
-    return render_template("login.html");
-
-
-
-
-
-
-
-
-
-@app.route("/newform", methods=['post', 'get'])
-def someFunc1():
-    if request.method=='POST':
-        print request.form["form_data"] # for debuggin.  Logs to the console.
-        search = request.form["form_data"]
-        from __init__ import APP_STATIC
-        with open(os.path.join(APP_STATIC, 'text.txt')) as f: 
-            text = f.read()
-        user = {'nickname': 'Miguel'}  # fake user
-        allposts = eval('[' + text + ']')
-        posts = filter(lambda person: person['author']['nickname'] == search, allposts)
-        return render_template("index2.html",
-                               title='Home',
-                               user=user,
-                               posts=posts)
-    return render_template("second_form.html");
-
-
-    #Basically read the users from the textfile into main memory
 
 
 if __name__ == '__main__':

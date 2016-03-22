@@ -1,0 +1,35 @@
+<!Doctype>
+
+<html>
+
+<body>
+{% extends "base.html" %}
+		{% block content %}
+		  <!-- This is shows the search bar and search button -->
+		 <form method = "POST">
+		 	<input type="text" name="person-name" placeholder="Find People" />
+		 	<button type="submit" name="submit" value="search-people">Search!</button>
+
+		 </form>
+		 {% for value in peopleList %}
+		 		<!-- We will create a form for every user that came up -->
+		 		<form method = "POST">
+		 			<div>
+		 				<p>  Username: {{value}} </p>
+		 				<button type = "submit" name="submit" value = "follow">Follow!</button> 
+		 				<input type = "hidden" name = "hidden" value = {{value}}/>
+		 			</div>
+
+		 		</form>
+		 	<br />
+		 {% endfor %}
+
+		 {{result}}
+		{% endblock %}	 
+
+</body>
+
+
+
+
+</html>

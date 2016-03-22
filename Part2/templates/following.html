@@ -5,7 +5,14 @@
 <body>
 {% extends "base.html" %}
 		{% block content %}
-		 {% for value in followList %}
+		 	<!-- This is shows the search bar and search button -->
+		 	<!-- This is used to search through ur follow list -->
+			 <form method = "POST">
+			 	<input type="text" name="search-name" placeholder="Search for a Friend" />
+			 	<button type="submit" name="submit" value="search-name">Search!</button>
+
+			 </form>
+			 {% for value in followList %}
 		 		<!-- We will create a form for every user that came up -->
 		 		<form method = "POST">
 		 			<div>
@@ -17,6 +24,7 @@
 		 		</form>
 		 	<br />
 		 {% endfor %}
+		 {{error}}
 		{% endblock %}	 
 
 </body>

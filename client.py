@@ -1,5 +1,5 @@
 from flask import Flask,render_template, request, redirect,url_for, session
-import os
+import os, socket
 app = Flask(__name__)
 
 users = {} # this holds all the users Stored as {userid, {username,password}}
@@ -7,6 +7,9 @@ users = {} # this holds all the users Stored as {userid, {username,password}}
 userTweets = {} # holds all the tweets of all the users
 listStuff = [] # holds this users tweets
 userFriends = {} # holds all the friends of the user
+
+host = "127.0.0.1"
+port = 13002
 
 '''----------------------------------------------------------------------
 
@@ -68,16 +71,20 @@ def create():
     name = request.form['name'] # get the name
     userName = request.form['user_name'] # get User name
     password = request.form['password'] # get pass
-    # check to see if this user_name exists because they must be unique!
-    if users.has_key(userName):
+
+    # connect to socket
+    serveroutput = servercomm("create"+":"+userName+":"+name+":"+password)
+    
+    print "serveroutput" + serveroutput[0] + "Asdas"
+    
+    if serveroutput[0] == 'exists': #username already exists
       print "error key already exists"
       return render_template("create.html", responsetext = "User Name already taken :(")
     else:
       print "Key successfully created! "
       writeKey(users,name,userName,password) # write the key to the dictionary and to the file
+      # writeKey(users,serveroutput[1],serveroutput[2],serveroutput[3]) # write the key to the dictionary and to the file
       session['userName'] = userName
-      # listStuff.insert(0,"")
-      # followFriend("") 
       return redirect(url_for("login_page"))
 
   return render_template("create.html")
@@ -152,10 +159,10 @@ def readFriends(friends):
 #When we successfully create a user, insert into the dictionary and write to the file
 def writeKey(users,name,userName,password):
   users[userName] = (name,password) #insert into the dictionary
-  file = open("users.txt","a") #write to the file
-  line = name + ":"+userName+":"+password+"\n"
-  file.write(line)
-  file.close()
+  # file = open("users.txt","a") #write to the file
+  # line = name + ":"+userName+":"+password+"\n"
+  # file.write(line)
+  # file.close()
   # also make a blank entry for the user tweets and friend list
   userTweets[userName] = []
   userFriends[userName] = []
@@ -188,17 +195,6 @@ def logout():
 
   file.close() #close the file
 
-  file = open("friends.txt",'w') #Save all the friends
-  for key,friends in userFriends.iteritems():
-    #write the userId
-    file.write(key);
-    #now loop through all the friends and write them to the file
-    for friend in friends:
-      file.write(":" + friend) 
-    file.write("\n") #write the new line character for the next user
-
-  file.close() #close the file
-
 
   session.pop('userName',None)
   listStuff[:] = [] # clears the list
@@ -225,6 +221,7 @@ def homePage():
   except KeyError:
     print("Redirect, Not Logged In")
     return redirect(url_for('login_page'))
+
 
   # if we made it here, then we have a user already logged in. So get that user 
   username = session['userName'] # get the username from the cache
@@ -254,8 +251,8 @@ def homePage():
   return render_template("homepage.html", username = username, messages = listStuff)
 
 
-@app.route('/search/', methods = ['post','get'])
-def search():
+@app.route('/search/<userinput>', methods = ['post','get'])
+def search(userinput):
   #Check if the user is logged in. If not, redirect.
   try:
     session['userName']
@@ -279,8 +276,6 @@ def search():
       friend = request.form['hidden'] # friend to unfollow
       unFollowFriend(friend)
 
-  else:
-    userinput = request.args.get('userinput')
 
   
   potentialFriends = [] # find all friends that match up with this name
@@ -366,6 +361,16 @@ def checkLogIn():
     print("Redirect, Not Logged In")
     return redirect(url_for('login_page'))
 
+def servercomm(input):
+  s = socket.socket() # Create socket object
+  s.connect((host, port))
+  s.send(input)
+  serveroutput = (s.recv(1024)).split(":")
+  print "IN server"
+  print serveroutput
+  s.close
+  return serveroutput
+
 @app.route('/delete', methods = ['post','get'])
 def deleteAccount():
   global users
@@ -400,6 +405,40 @@ def deleteAccount():
   file.close() #close the file
   return redirect(url_for('logout'))
 
+# This method finds all of my friends and returns them. I could also unfollow friends from this function
+@app.route('/following/', methods = ['post','get'])
+def displayMyFollowing():
+  username = session['userName'] # get my username
+  if request.method == 'POST':
+    # we are unfollowing a person
+    friend = request.form['hidden'].strip('/') # get the persons name
+    print friend
+    followList = servercomm('unfollow:' + username + ":" + friend)
+    if (followList[0] == "success"):
+      followList.pop(0) # popping status code
+      followList.pop(0) # popping my userId
+      return render_template("following.html",followList = followList)
+    else:
+      return "error occured :("
+
+
+
+
+  else:
+
+    followList = servercomm('getFollowing:' + username ) # ask the server to send over all of my friends
+    #print serveroutput
+    if (followList[0] == "success"):
+      # meaning we are good
+      # split the python string using colon
+      #followList = serveroutput.split(":") # split using the colon
+      # we don't care for the status code nor the userid, so remove the first two
+      followList.pop(0) # popping status code
+      followList.pop(0) # popping my userId
+      print followList
+      return render_template("following.html", followList = followList)
+
+
 
 
 
@@ -415,3 +454,5 @@ def force():
 if __name__ == '__main__':
   app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT' # this is the key used for the session
   app.run("127.0.0.1",1300,debug = True)
+
+

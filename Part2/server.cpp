@@ -2,7 +2,7 @@
 //  main.cpp
 //  test
 //
-//  Created by Saqib Banna on 3/16/16.
+//  Created by Saqib Banna and Shahzaib on 3/16/16.
 //  Copyright (c) 2016 Learning. All rights reserved.
 //
 
@@ -665,6 +665,7 @@ string follow(const string& myUserName, const string& personName){
         getline(iss,username,':'); // get the username (first field)
         if (username == myUserName)
             line = line + ":" + personName; // appened the personname to the end of my follow list
+        cout << "Writing the line in the follow function: "<<line<<endl;
         outFile << line<<endl; // write to the file
     }
     inFile.close();

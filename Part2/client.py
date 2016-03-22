@@ -59,13 +59,20 @@ def create():
 
   if request.method == 'POST':
     # now get the name/username & password to create the account
-    # connect to socket, return information
-    serveroutput = servercomm("create"+":"+request.form['user_name']+":"+request.form['name']+":"+request.form['password'])
-    if serveroutput[0] == 'exists': #username already exists
-      return render_template("create.html", responsetext = "User Name already taken :(")
-    elif serveroutput[0] == 'newaccount':
-      session['userName'] = request.form['user_name']
-      return redirect(url_for("login_page"))
+    name = request.form['name'].strip('/')  # get the name
+    username = request.form['user_name'].strip('/') # get the username
+    password = request.form['password'].strip('/') #get the password of the user
+    # note we disallow usernames,names, pass to contain ':'!
+    if (':' in name) or (':' in username) or (':' in password):
+      return render_template("create.html", responsetext = "Your fields contain colon (:) which are prohibited :(. Please correct the error and try again") # User entered invalid data
+    else:
+      # connect to socket, return information
+      serveroutput = servercomm("create"+":"+username+":"+name+":"+password) # open the socket and try to account
+      if serveroutput[0] == 'exists': #username already exists
+        return render_template("create.html", responsetext = "User Name already taken :(")
+      elif serveroutput[0] == 'newaccount':
+        session['userName'] = request.form['user_name']
+        return redirect(url_for("login_page"))
   else:
     return render_template("create.html")
 
@@ -104,7 +111,9 @@ def homePage():
       #Send the server the new tweet, get a list of all tweets in return
       userTweet = request.form['tweet'].strip('/')
       if ':' in userTweet: # we are not allowing the user to enter a : in the tweet
-        return render_template("homepage.html",error = "You can't have a colon in your tweet. Please try again with a valid tweet");
+        return render_template("homepage.html",error = "You can't have a colon in your tweet. Please try again with a valid tweet or click homepage");
+      elif not userTweet: # its empty
+        return render_template("homepage.html",error = "You can't have a empty tweet. Please try again with a valid tweet or click the homepage");
       else:
         time = datetime.now().strftime('%Y-%m-%d %H %M %S') # get the time of when this tweet was sent
         listStuff = servercomm("tweet:"+session['userName']+":"+request.form['tweet'] + ":" +time) 
@@ -122,8 +131,8 @@ def homePage():
             time = datetime.strptime(listStuff[index], "%Y-%m-%d %H %M %S")
             index += 1
             # add it to the list
-            print mssg
-            print time
+            # print mssg
+            # print time
             newList.append((time,mssg))
           newList = newList[::-1] # reverse the list
           #listStuff = listStuff[::-1]# reverse the list to put the latest times in the front
@@ -133,13 +142,17 @@ def homePage():
     elif request.form['submit'] == 'search-people': # User is trying to find other people that are on the site
       # If it's a search request, we will want to show what the user was searching for
       personName = request.form['find-person'].strip("/")
-      #print personName
-      if personName: # make sure it's not empty
+      if not personName:
+        return redirect(url_for('homePage')) # just redirect to homepage
+      else:
         return redirect(url_for('searchPeople',personName = personName)) # pass the persons name over to the function
     elif request.form['submit'] == 'search-tweet': #If the user is trying to find all the tweets of a particular person
       findPersonTweet = request.form['find-tweet'].strip("/") # get the userinput ( which is the person we wanna find) and strip the extra '/' which comes with the input
       if findPersonTweet: #make sure the request wasn't an empty request
         return redirect(url_for('searchPersonTweet',findPersonTweet = findPersonTweet)) # Redirect to this function and pass in findPersonTweet as a param
+      else: #Make  sure it's not empty
+        return redirect(url_for('homePage'))
+
   # if we made it here, we are on the same page, simply update our feedpage
   else:
     listStuff = servercomm("gettweet:"+session['userName'])    # connect to socket, return information 
@@ -202,9 +215,11 @@ def searchPeople():
       #print peopleList
       return render_template("displayPeople.html", peopleList = peopleList)
     else:
-      return "Error :("
-  else:
-    return "Error :("
+      return render_template("displayPeople.html", error = "There was an error :(. Please try again later")
+  else: #just return the same page
+    return render_template("displayPeople.html")
+
+
 
 # This method basically gets all the tweets of a particular user ( only allow search by username)
 # Note we allow to search for anyone's tweets ( not just the people we are following)
@@ -221,6 +236,9 @@ def searchPersonTweet():
     return redirect(url_for('searchPersonTweet',findPersonTweet = findPersonTweet)) # redirect to change the name in the url
   else: # else it was a userinput from the homepage
     findPersonTweet = request.args.get('findPersonTweet')
+    # if this is empty, dedirect the page
+    if not findPersonTweet:
+      return render_template("displayTweets.html")
   # Open the socket and get the search for the peeps
   tweetList = servercomm("searchPersonTweet:" + findPersonTweet) # note we could also search for our own tweets
   #print tweetList

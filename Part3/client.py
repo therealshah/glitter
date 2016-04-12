@@ -9,13 +9,13 @@ userTweets = {} # holds all the tweets of all the users
 listStuff = [] # holds this users tweets
 userFriends = {} # holds all the friends of the user
 
-#host = "127.0.0.1"
-#172.16.30.242:59284
 
-# port = 13002
+#172.16.30.242:59284
+host = "127.0.0.1"
+port = 13002
 #host = "pdc-amd01.poly.edu" # Where do you want to connect
-host = "pdc-amd01.poly.edu"
-port = 63099 
+# host = "pdc-amd01.poly.edu"
+# port = 63099 
 
 
 '''----------------------------------------------------------------------
@@ -373,4 +373,4 @@ def force():
 
 if __name__ == '__main__':
   app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT' # this is the key used for the session
-  app.run("127.0.0.1",1300,debug = True)
+  app.run("127.0.0.2",1300,debug = True)

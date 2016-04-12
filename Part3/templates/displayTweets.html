@@ -1,0 +1,31 @@
+<!Doctype>
+
+<html>
+
+<body>
+{% extends "base.html" %}
+		{% block content %}
+	 	<!-- Find all the tweets of a particluar person -->
+		 <form method = "POST">
+		 	<input type="text" name="find-tweet" placeholder="Search Tweets">
+		 	<button type = "submit" name ="submit" value ="search-tweet">Search for a Person's Tweet!</button>
+		 </form>
+		 <!-- Only displayed if we successfully get the person's tweets -->
+		 <p> {{message}} </p>
+		 <br />
+		 {% for time,tweet in tweetList %}
+		 	<p> Time:  {{time}} </p>
+		 	<p> {{tweet}}
+		 	<br />
+		 {% endfor %}
+
+		 <!-- This only used when there is an error -->
+		 {{error}}
+		{% endblock %}	 
+
+</body>
+
+
+
+
+</html>

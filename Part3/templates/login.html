@@ -1,0 +1,32 @@
+<!doctype>
+<html>
+<head>
+	<title> Glitter Login </title>
+	<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='css/style.css') }}">
+</head>
+
+<body>
+	<div class="container">
+		<h1>Welcome to Glitter</h1>
+
+		<h4>Please sign in below</h4>
+
+		<!-- This is used to get the data to create the accounts for the user-->
+		<form method = "POST">
+			<p>Username: <input type = "text" placeholder = "Enter your username" name = "user_name"/></p>
+			<p>Password: <input type = "password" placeholder = "Enter your password" name="password" /></p>
+			<p><input type = "submit" name = "submit" value="Sign In"></form></p>
+		</form>
+
+		<!-- This is the form used to create the page -->
+		<form method = "POST">
+			<button type="submit" name="submit" value="create_account"> Don't have a account yet? </button>
+		</form>
+
+		<div class="error">{{responsetext}}</div>
+	</div>
+
+
+
+</body>
+</html>

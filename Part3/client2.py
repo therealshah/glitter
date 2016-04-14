@@ -42,7 +42,7 @@ def login_page():
     if request.form["submit"] == "Sign In": # user is trying to log into his/her account
       #print request.form["user_name"] #print to the console for debugging purposes
       #communicate with the server, return id
-      serveroutput = servercomm("signin"+":"+request.form["user_name"]+":"+request.form["password"])
+      serveroutput = servercomm("r:signin"+":"+request.form["user_name"]+":"+request.form["password"])
       # ck the credentials
       if serveroutput[0] == "invalid":
         return render_template("login.html", responsetext="You entered a invalid username/password")
@@ -73,7 +73,7 @@ def create():
       return render_template("create.html", responsetext = "Your fields contain colon (:) which are prohibited :(. Please correct the error and try again") # User entered invalid data
     else:
       # connect to socket, return information
-      serveroutput = servercomm("create"+":"+username+":"+name+":"+password) # open the socket and try to account
+      serveroutput = servercomm("w:create"+":"+username+":"+name+":"+password) # open the socket and try to account
       if serveroutput[0] == 'exists': #username already exists
         return render_template("create.html", responsetext = "User Name already taken :(")
       elif serveroutput[0] == 'newaccount':
@@ -122,7 +122,7 @@ def homePage():
         return render_template("homepage.html",error = "You can't have a empty tweet. Please try again with a valid tweet or click the homepage");
       else:
         time = datetime.now().strftime('%Y-%m-%d %H %M %S') # get the time of when this tweet was sent
-        listStuff = servercomm("tweet:"+session['userName']+":"+request.form['tweet'] + ":" +time) 
+        listStuff = servercomm("w:tweet:"+session['userName']+":"+request.form['tweet'] + ":" +time) 
         newList = []
         if listStuff[0] == 'success': # if successfull
           listStuff.pop(0); # pop the status code
@@ -161,7 +161,7 @@ def homePage():
 
   # if we made it here, we are on the same page, simply update our feedpage
   else:
-    listStuff = servercomm("gettweet:"+session['userName'])    # connect to socket, return information 
+    listStuff = servercomm("r:gettweet:"+session['userName'])    # connect to socket, return information 
     if listStuff[0] == 'success': # if successfull
       listStuff.pop(0); # pop the status code
       listStuff.pop(0); # pop my username
@@ -202,7 +202,7 @@ def searchPeople():
       return redirect(url_for('searchPeople',personName = personName))
     elif request.form['submit'] == 'follow': # we are going to follow this person
       followPerson = request.form['hidden'].strip("/") # get the persons name
-      statusCode = servercomm("follow:" + username + ":"+ followPerson)
+      statusCode = servercomm("w:follow:" + username + ":"+ followPerson)
       #print "testing" + statusCode[0]
       if statusCode[0] == 'success':  # it was a success
         return render_template("displayPeople.html", result = "Successfully followed " + followPerson + ":D" )
@@ -215,7 +215,7 @@ def searchPeople():
   # now send the request over to c++ to find all people matching my name
   # only do it if the personName field isn't blank
   if personName:
-    peopleList = servercomm("searchPeople:" + username + ":" + personName) # pass in my id so we don't return ourselves
+    peopleList = servercomm("r:searchPeople:" + username + ":" + personName) # pass in my id so we don't return ourselves
     if peopleList[0] == 'success':
       peopleList.pop(0) # pop the error code
       #print peopleList
@@ -246,7 +246,7 @@ def searchPersonTweet():
     if not findPersonTweet:
       return render_template("displayTweets.html")
   # Open the socket and get the search for the peeps
-  tweetList = servercomm("searchPersonTweet:" + findPersonTweet) # note we could also search for our own tweets
+  tweetList = servercomm("r:searchPersonTweet:" + findPersonTweet) # note we could also search for our own tweets
   #print tweetList
   if tweetList[0] == 'success': # we were sucessful
     tweetList.pop(0) # pop the status code
@@ -285,7 +285,7 @@ def displayMyFollowing():
   if request.method == 'POST':     # we are unfollowing a person
     if request.form['submit'] == 'unfollow': # if it was a unfollow request
       personName = request.form['hidden'].strip('/') # get the persons name
-      followList = servercomm('unfollow:' + username + ":" + personName)  # Unfollow the friend and get the new list back
+      followList = servercomm('w:unfollow:' + username + ":" + personName)  # Unfollow the friend and get the new list back
       #print 'Debugging', followList
       if (followList[0] == "success"): # If it was successful
         followList.pop(0) # popping status code
@@ -295,14 +295,14 @@ def displayMyFollowing():
         return render_template("following.html", error = "There was an error search for " + personName + " :(")
     else: # This request is to search for a person in ur followlist
       personName = request.form['search-name'].strip('/'); # get the user input and strip the extra character that is also added
-      followList = servercomm('searchFollowList:' + username+":" + personName) 
+      followList = servercomm('r:searchFollowList:' + username+":" + personName) 
       if (followList[0] == 'success'): # if it was successful
         followList.pop(0) # popping status code
         return render_template("following.html", followList= followList)
       else:
         return render_template("following.html", error = "There was an error search for " + personName + " :(")
   else:
-    followList = servercomm('getFollowing:' + username ) # ask the server to send over all of my friends
+    followList = servercomm('r:getFollowing:' + username ) # ask the server to send over all of my friends
     #print followList
     if (followList[0] == "success"):
       # meaning we are good
@@ -358,7 +358,7 @@ def deleteAccount():
   except KeyError:
     print("Redirect, Not Logged In")
     return redirect(url_for('login_page'))
-  servercomm("delete:"+session['userName'])  #Delete all existance from the server
+  servercomm("w:delete:"+session['userName'])  #Delete all existance from the server
   return redirect(url_for('logout'))
 
 
@@ -373,4 +373,4 @@ def force():
 
 if __name__ == '__main__':
   app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT' # this is the key used for the session
-  app.run("127.0.0.4",1300,debug = True)
+  app.run("127.0.0.3",1300,debug = True)

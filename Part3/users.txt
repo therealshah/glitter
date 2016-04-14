@@ -7,6 +7,5 @@ tasnim:tasnim:tasnim
 matt:matt:matt
 test:matt:test
 chadjones:chad:chad
-nico:nico:nico
 yolo:yolo:yolo
 tas:tasnim:tas

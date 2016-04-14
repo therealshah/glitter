@@ -59,7 +59,8 @@ void manageQueue(); // thread function
 void finishedTask(const string& theoutput, char type, int connfd);
 
 // THIS IS FOR CONCURRENCY
-queue<pair<istringstream,int>> line; // used to manage read/writes
+// queue<pair<istringstream,int>> line; // used to manage read/writes
+queue<pair<string,int>> line; // used to manage read/writes
 int readCounter = 0; // keep track iof how many reads are happening
 bool isWriteHap = false;
 mutex readLock; // used for the reads to increment the counter
@@ -111,7 +112,7 @@ int main(int argc, char **argv) {
     }
 
     thread bouncer(manageQueue); // bounder for the read/write
-    
+    unique_lock<mutex> ql(queueLock,defer_lock); // set up unique lock for queue lock, but dont lock now
     
     for ( ; ; ) {
         // 5. Block until someone connects.
@@ -130,18 +131,20 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Connected\n");
         
         // We had a connection.  Do whatever our task is.
-        cout <<" after ticks";
+        //cout <<" after ticks";
         ticks = time(NULL);
-        cout <<" after ticks";
+        //cout <<" after ticks";
         // snprintf(buff, sizeof(buff), "%.24s\r\n", ctime(&ticks));
         char thingy[MAXLINE];
         read(connfd,thingy,MAXLINE);
-        cout <<" Pushing into queue";
-        // we basically put this request into the queue
+        cout <<"Main:Pushing into queue\n";
+        // we basically put this request\n into the queue
         // Then we signal bouncer to take care of it
-        queueLock.lock();
-       // line.push(make_pair(istringstream(thingy),connfd));
-        queueLock.unlock(); // unlock the queue lock
+        cout << "Main:Getting queuelock\n";
+        ql.lock();
+        line.push(make_pair(thingy,connfd));
+        ql.unlock(); // unlock the queue lock
+        cout << "Main:Unlocking and signaling\n";
         isEmpty.notify_all(); // signal the waiting bouncer thread
 
         // string theoutput = thefunction(thingy);
@@ -177,15 +180,22 @@ void manageQueue(){
     unique_lock<mutex> wl(writeLock,defer_lock); // for write lock
     unique_lock<mutex> rl(readLock, defer_lock); // for read lock
     while (true){
-        // first ck if queue is empty or not
+        //     // first ck if queue is empty or not
+        cout << "ManageQueue:Locking queue"<<endl;
         ul.lock(); // lock the queue
-        while (line.empty()) isEmpty.wait(ul); // wait until there is an element
+        while (line.empty()){
+            cout << "ManageQueue:Sleeping on queue signal\n";
+            isEmpty.wait(ul); // wait until there is an element
+            cout << "ManageQueue:Waking up on queue signal\n";
+        } 
         // now ck the front of the queue
+        cout << "ManageQueue:We woke up. Popping from qeueu\n";
         auto req = line.front(); // get the top element
         line.pop(); // pops the element
         ul.unlock(); // unlock to all the main to push more requests
+        cout << "ManageQueue:Unlocked the queue\n";
         // now ck if the request can go
-        istringstream iss = req.first; // get the string stream
+        istringstream iss(req.first); // get the string and make a stringstream
         string requestType; // ck if read or write request
         getline(iss,requestType,':'); 
         /*---------------------------------
@@ -195,16 +205,24 @@ void manageQueue(){
                 3. otherwise, incremenet count and go
         ------------------------------------*/ 
         if (requestType == "r"){
+            cout << "ManageQueue:Read request\n";
+            cout << "Getting write lock\n";
             wl.lock(); // get write lock and increment ur count
             // while a write is happening, sleep until u are notified
-            while (isWriteHap) doneWriting.wait(wl); 
+            while (isWriteHap){
+                cout << "ManageQueue:Sleeping on write signal\n";
+                doneWriting.wait(wl); 
+                cout << "ManageQueue:Waking up on write signal\n";
+            }
+            cout << "ManageQueue:Getting read lock\n";
             rl.lock(); // lock the read so we can increment
             readCounter++; // increment the read counter
             rl.unlock(); // unlock the read lock
             wl.unlock(); // unlock the write lock
+            cout << "ManageQueue:Unlocking both read lock and write lock\n";
 
             // now we are good to handle the request
-            vect.push_back(thread(thefunction,iss,req.second)); // pass stringstream and confd
+            vect.push_back(thread(thefunction,ref(iss),req.second)); // pass stringstream and confd
 
         }
         /*---------------------------------
@@ -213,15 +231,23 @@ void manageQueue(){
             2. sleep until no reads
         ------------------------------------*/ 
         else if (requestType == "w"){
+            cout << "ManageQueue:Write request\n";
+            cout << "ManageQueue:Getting write lock\n";
             wl.lock(); // make sure no other write AND READ can access the files
             // while a write is happening, sleep until u are notified
             while (isWriteHap) doneWriting.wait(wl); 
+            cout << "ManageQueue:Getting read lock\n";
             rl.lock(); // acquire the increment lock
             // if there are reads happening, wait until the reads are done
             // dont let go of ur write lock bc this is the first lock every
             // thread needs to get
             // SO its fair
-            while (readCounter != 0) doneReading.wait(rl);
+            while (readCounter != 0){
+                cout << "ManageQueue:Sleeping on read signal\n";
+                doneReading.wait(rl);
+                cout << "ManageQueue:Waking up on read signal\n";
+ 
+            } 
             // while (readCounter != 0){
             //     // unlock, sleep fir a bit and try again
             //     readLock.unlock();
@@ -232,7 +258,8 @@ void manageQueue(){
             // unlock the read and write and go
             rl.unlock();
             wl.unlock();
-            vect.push_back(thread(thefunction,iss,req.second)); // pass stringstream and confd
+            cout << "ManageQueue:Unlocking both read lock and write lock\n";
+            vect.push_back(thread(thefunction,ref(iss),req.second)); // pass stringstream and confd
         }
         else{
             cerr << "WHAT?";
@@ -240,7 +267,7 @@ void manageQueue(){
         }
 
 
-    }
+     } // end of while loop
 }
 
 /*----------------------------------------------------------------------------
@@ -257,15 +284,18 @@ void finishedTask(const string& theoutput, char type, int connfd){
     // if read, decrement counter
     // if read counter is 0, signal doneReading
     if (type == 'r'){
+        cout << "FinishedTask:Getting read lock\n";
         unique_lock<mutex> rl(readLock);
         // if we are the last read, signal and unlock
         if (--readCounter == 0){
+            cout << "Signaling\n";
             doneReading.notify_all();
         }
         rl.unlock(); // unlock bc we don't need it
+        cout << "FinishedTask:unlocking read lock\n";
         char      buff[MAXLINE]; // used to return the output
         snprintf(buff, sizeof(buff), "%s", theoutput.c_str()); // store the output into the buffer
-        printf(buff);
+       // printf(buff);
         int len = strlen(buff);
         if (len != write(connfd, buff, strlen(buff))) {
             perror("write to connection failed");
@@ -277,15 +307,18 @@ void finishedTask(const string& theoutput, char type, int connfd){
     }
     // if write, change iswriteHap to false and notify all
     else if (type == 'w'){
+        cout << "FinishedTask:Getting write lock\n";
         unique_lock<mutex> wl(writeLock);
         // if we are the last read, signal and unlock
         isWriteHap = false; // no more writes
+        cout << "FinishedTask:Signaling done writning\n";
         doneWriting.notify_all(); // we are done writing
         wl.unlock(); // unlock bc we don't need it
+        cout << "FinishedTask:unlocking write lock\n";
         // everything else is just return the output the user and close connection
         char      buff[MAXLINE]; // used to return the output
         snprintf(buff, sizeof(buff), "%s", theoutput.c_str()); // store the output into the buffer
-        printf(buff);
+        //printf(buff);
         int len = strlen(buff);
         if (len != write(connfd, buff, strlen(buff))) {
             perror("write to connection failed");
@@ -344,7 +377,7 @@ void thefunction(istringstream& iss,int connfd){
         getline(iss,timestamp,':'); // this is the timestamp
         writeTweet(id, tweet,timestamp);
         string output =  getTweets(id);
-        finishedTask(output,'r',connfd);
+        finishedTask(output,'w',connfd);
 
     } 
     else if(thefunc == "searchPeople"){ // read
@@ -854,7 +887,7 @@ string follow(const string& myUserName, const string& personName){
         getline(iss,username,':'); // get the username (first field)
         if (username == myUserName)
             line = line + ":" + personName; // appened the personname to the end of my follow list
-        cout << "Writing the line in the follow function: "<<line<<endl;
+        //cout << "Writing the line in the follow function: "<<line<<endl;
         outFile << line<<endl; // write to the file
     }
     inFile.close();

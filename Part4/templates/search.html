@@ -1,0 +1,79 @@
+<!DOCTYPE>
+<html>
+	<body>
+
+		{% extends "base.html" %}
+		{% block content %}
+		 <div>
+		    <h1>Search Results:</h1>
+
+		    <!-- This is shows the search bar and search button -->
+			 <form method = "POST">
+			 	<input type="text" name="search"/>
+			 	<button type="submit" name="submit" value="search">Search!</button>
+
+			 </form>
+
+			
+			 <div class = "potentialFriends">
+			 <fieldset>
+			 <legend> Search for Friends!</legend>
+					 {% for key,value in potentialFriends %}
+					 		<!-- We will create a form for every user that came up -->
+					 		<form method = "POST">
+					 			<div>
+					 				<label> 
+					 					Name:{{value}}
+					 					UserId: {{value}}  
+					 				</label>
+					 				<button type = "submit" name="submit" value = "follow">Follow!</button> </p>
+					 				<input type = "hidden" name = "hidden" value = {{key}}/>
+					 			</div>
+
+					 		</form>
+					 	<br />
+					 {% endfor %}
+				 </div>
+			</fieldset>
+			<!-- This displays all of my friends -->
+			<div class = "myFriends">
+			<fieldset>
+			<legend> Friend list </legend>
+				 {% for value in myFriends %}
+				 		<!-- We will create a form for every user that came up -->
+				 		<form method = "POST">
+				 			<div>
+				 				<p>  Username: {{value}} </p>
+				 				<button type = "submit" name="submit" value = "unfollow">Unfollow!</button> 
+				 				<input type = "hidden" name = "hidden" value = {{value}}/>
+				 			</div>
+
+				 		</form>
+				 	<br />
+				 {% endfor %}
+			</fieldset>
+			</div>
+			<!-- This will display all the tweets-->
+			<div class = "displayTweets">
+				<fieldset>
+					<legend>Tweets!</legend>
+					 {% for key,value in tweets %}
+					 		<!-- We will create a form for every user that came up -->
+					 			<div>
+					 				<p>  {{key}} </p>
+					 				<p> {{value}} </p>
+					 			</div>
+					 	<br />
+					 {% endfor %}
+
+				    {% for friendtweet in friendtweets %}
+				    <div><p>{{ friend }} says: <b>{{ friendtweet }}</b></p></div>
+				    {% endfor %}
+
+			    </fieldset>
+		    </div>
+		
+
+		{% endblock %}
+	</body>
+</html>

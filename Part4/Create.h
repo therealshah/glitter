@@ -13,6 +13,7 @@
 
 #include <string>
 
- std::string create(const std::string& id, const std::string& username, const std::string& password);
+ std::string create(const std::string& id, const std::string& username, const std::string& password,const std::string& tweetFile, 
+    const std::string& friendsFile, const std::string& userFile);
 
 #endif

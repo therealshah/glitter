@@ -12,9 +12,9 @@ using namespace std;
 
 
 // Go through the tweet file, find the id, put the tweets
-string getTweets(const string& id){
+string getTweets(const string& id, const string& tweetFile){
     string line, idOnFile, tweet;
-    ifstream tweetfile("tweets.txt");
+    ifstream tweetfile(tweetFile);
     if(!tweetfile.is_open())
         {
             cout<< "Tweet file did not open \n";
@@ -35,9 +35,9 @@ string getTweets(const string& id){
     return "notfound"; // not found
 };
 
-void writeTweet(const string& id, const string& tweet, const string& timestamp){
+void writeTweet(const string& id, const string& tweet, const string& timestamp,const string& tweetFile){
     string str, username;
-    char nameOfTweetFile[] = "tweets.txt";
+    char nameOfTweetFile[] = tweetFile;
     char tempTweetFile[] = "tweetstemp.txt"; // tempfile to write into
 
     ifstream in_file(nameOfTweetFile); // Reach from original tweet file
@@ -73,11 +73,11 @@ void writeTweet(const string& id, const string& tweet, const string& timestamp){
 
 
 // This method searches for a particluar person's tweet
-string searchPersonTweet(const string& personName){
+string searchPersonTweet(const string& personName, const string& tweetFile){
     // call the getTweet function on this person
     try{
      
-        return getTweets(personName);
+        return getTweets(personName, tweetFile);
     }
     catch(...){
         return "error";

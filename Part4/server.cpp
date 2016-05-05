@@ -338,12 +338,16 @@ void thefunction(istringstream& iss,int connfd){
     //cout << "From client: " << theinput << endl;
    //cout << thefunc<<endl;
     // Now we will parse for functionality and call the right function to handle the request
+    const string TWEET_FILE = "tweets_server1.txt";
+    const string USERS_FILE =  "users_server1.txt";
+    const string FRIENDS_FILE =  "friends_server1.txt";
+
     if(thefunc == "create"){
         string id, name, password;
         getline(iss,id,':');
         getline(iss,name,':');
         getline(iss,password,':');
-        string output =  create(id,name,password); // get output
+        string output =  create(id,name,password,TWEET_FILE,FRIENDS_FILE,USERS_FILE); // get output
         finishedTask(output,'w',connfd); // weite
 
     } 
@@ -351,14 +355,14 @@ void thefunction(istringstream& iss,int connfd){
         string id, password;
         getline(iss,id,':');
         getline(iss,password,':');
-        string output =  signin(id,password);
+        string output =  signin(id,password,USERS_FILE);
         finishedTask(output,'r',connfd);
         
     } 
     else if(thefunc == "gettweet"){ // read
         string id;
         getline(iss,id,':');
-        string output =  getTweets(id);
+        string output =  getTweets(id,TWEET_FILE);
         finishedTask(output,'r',connfd);
     } 
     else if(thefunc == "tweet"){ // read
@@ -366,8 +370,8 @@ void thefunction(istringstream& iss,int connfd){
         getline(iss,id,':');
         getline(iss,tweet,':');
         getline(iss,timestamp,':'); // this is the timestamp
-        writeTweet(id, tweet,timestamp);
-        string output =  getTweets(id);
+        writeTweet(id, tweet,timestamp,TWEET_FILE);
+        string output =  getTweets(id,TWEET_FILE);
         finishedTask(output,'w',connfd);
 
     } 
@@ -377,27 +381,27 @@ void thefunction(istringstream& iss,int connfd){
         // get the username and person to look up ( note we will look up using both name and userid)
         getline(iss,username,':');
         getline(iss,personName,':');
-        string output =  findPeople(username,personName);
+        string output =  findPeople(username,personName,USERS_FILE);
         finishedTask(output,'r',connfd);
     } 
     else if (thefunc == "searchFollowList"){ // read
         string username,personName;
         getline(iss,username,':');
         getline(iss,personName,':');
-        string output =  getFollowing(username,personName); // overloaded function to get the people that are following based on the personName
+        string output =  getFollowing(username,personName,FRIENDS_FILE); // overloaded function to get the people that are following based on the personName
         finishedTask(output,'r',connfd);
     }
     else if(thefunc == "delete"){ //read
         string id;
         getline(iss,id);
-        deleteAccount(id);
+        deleteAccount(id,TWEET_FILE,USERS_FILE,FRIENDS_FILE);
         finishedTask("delete happening",'w',connfd); // we puut dummy data in for output bc delete doesnt do anything
     } 
     else if (thefunc == "getFollowing"){ // read
         // get all of my friends
         string username; // used to hold the username
         getline(iss,username,':'); // get the username
-        string output =  getFollowing(username); // gets all the people i am following
+        string output =  getFollowing(username,FRIENDS_FILE); // gets all the people i am following
         finishedTask(output,'r',connfd);
     }
     else if (thefunc == "unfollow"){ //write
@@ -405,7 +409,7 @@ void thefunction(istringstream& iss,int connfd){
         string username,friendname; // remove the friend from my friends list
         getline(iss,username,':'); // my name
         getline(iss,friendname,':'); // friendname
-        string output = unfollow(username,friendname);
+        string output = unfollow(username,friendname,FRIENDS_FILE);
         finishedTask(output,'w',connfd);
     } 
     else if (thefunc == "follow"){ //write
@@ -413,14 +417,14 @@ void thefunction(istringstream& iss,int connfd){
         // get my id and the person i wanna unfollow's id
         getline(iss,username,':');
         getline(iss,personName,':');
-        string output =  follow(username,personName);
+        string output =  follow(username,personName,FRIENDS_FILE);
         finishedTask(output,'w',connfd);
     }
     else if (thefunc == "searchPersonTweet"){ //read
         // we are getting a particular person's tweets
         string personName;
         getline(iss,personName,':'); // get the name of person we are searching for
-        string output=  searchPersonTweet(personName);
+        string output=  searchPersonTweet(personName,TWEET_FILE);
         finishedTask(output,'r',connfd);
     }
     else {

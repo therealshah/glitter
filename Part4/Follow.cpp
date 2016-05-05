@@ -18,10 +18,10 @@ using namespace std;
 -- This method gets all the people i am following
 -- Will return an error code if an error occurs otherwise it will return success with the user friends
 */
-string getFollowing(const std::string& username){
+string getFollowing(const std::string& username,const string& friendFile){
     
     // open the file for reading and find my username
-    ifstream ifs("friends.txt"); // open the file for reading
+    ifstream ifs(friendFile); // open the file for reading
     if (!ifs){
         cerr << "Couldn't open file\n";
         return "error";
@@ -51,9 +51,9 @@ string getFollowing(const std::string& username){
     --  makes use of the getFollowing method
 
 */
-string getFollowing(const string& username, const string& personName){
+string getFollowing(const string& username, const string& personName,const string& friendFile){
     // call the other getFollowing method to get my followlist
-    string followList = getFollowing(username);
+    string followList = getFollowing(username,friendFile);
     // ck if it was sucessfull
     if (followList == "error")
         return followList; // basically return if we encoutnered an error
@@ -80,10 +80,10 @@ string getFollowing(const string& username, const string& personName){
  -- basically removes the friend from the followlist of username
  
  */
-string unfollow(const string& username,const string& personName){
+string unfollow(const string& username,const string& personName,const string& friendFile){
 
     char nameOfTempFile[] = "temp.txt";
-    char nameOfFriendFile[] = "friends.txt";
+    char nameOfFriendFile[] = friendFile;
     string str, idsInFile;
     string output = "success"; // we will also keep track of our friends so we don't have to reopen the file to find our friends
     
@@ -150,7 +150,7 @@ string unfollow(const string& username,const string& personName){
 
 
 // Finds all the people that are friends of the username
-string findPeople(const string& myUserName, const string& personName){
+string findPeople(const string& myUserName, const string& personName, const string& userFile){
     string returnMssg = "success"; // this will hold the return mssg  
     // first read in all of my friends
     unordered_map<string,vector<string>> map; // hold all the followers of a person
@@ -162,7 +162,7 @@ string findPeople(const string& myUserName, const string& personName){
     while (getline(followList,token,':'))
         followVect.push_back(token); // push back the name in the follow vector
     // now read in all users
-    ifstream ifs("users.txt");
+    ifstream ifs(userFile);
     if (!ifs){
         cout << "Can't open users.txt file\n";
         return "error";
@@ -195,11 +195,11 @@ string findPeople(const string& myUserName, const string& personName){
 
 
 // This method will bascically add the person to the friend vector
-string follow(const string& myUserName, const string& personName){
+string follow(const string& myUserName, const string& personName,const string& friendFile){
 
     // we will read from the input file and store in a temp output file. If we encounter the username, we will simply
     // append it's data to the end of the string
-    char inputFile [] = "friends.txt";
+    char inputFile [] = friendFile;
     char outputFile [] = "temp.txt";
     ifstream inFile(inputFile);
     if (!inFile){

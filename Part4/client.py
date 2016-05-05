@@ -1,6 +1,32 @@
 from flask import Flask,render_template, request, redirect,url_for, session
 import os, socket
 from datetime import datetime
+from flask import g
+
+class CounterWrapper:
+  def __init__(self):
+    self.counter = 0
+
+  def increment_request(self):
+    self.counter = self.counter+ 1
+    return self.counter
+
+    
+def get_user():
+    user = getattr(g, 'user', None)
+    if user is None:
+        user = fetch_current_user_from_database()
+        g.user = user
+    return user
+
+def get_request_counter():
+    counter = getattr(g, 'rCounter', None)
+    if counter is None: # if it doesn't exist already
+        counter =  CounterWrapper()
+        g.rCounter = counter
+    return counter.increment_request() # return the 0 counter
+
+
 app = Flask(__name__)
 
 users = {} # this holds all the users Stored as {userid, {username,password}}
@@ -175,8 +201,8 @@ def homePage():
         index+=1
         time = datetime.strptime(listStuff[index], "%Y-%m-%d %H %M %S")
         index += 1
-        print mssg
-        print time
+        # print mssg
+        # print time
         # add it to the list
 
         newList.append((time,mssg))
@@ -338,7 +364,8 @@ def servercomm(input):
       print 'Hostname could not be resolved. Exiting'
       sys.exit()
        
-  print 'Ip address of ' + host + ' is ' + remote_ip
+  #print 'Ip address of ' + host + ' is ' + remote_ip
+  print "Request = ",  get_request_counter() # request counter
   s = socket.socket() # Create socket object
   s.connect((host, port))
   #print "the input:" + input
@@ -373,4 +400,4 @@ def force():
 
 if __name__ == '__main__':
   app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT' # this is the key used for the session
-  app.run("127.0.0.2",1300,debug = True)
+  app.run("127.0.0.1",1300,debug = True)

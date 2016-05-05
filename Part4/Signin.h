@@ -13,6 +13,6 @@
 
     
     // Function for Signing into Accounts
-    std::string signin(const std::string& id, const std::string& password, const std::string& userFile);
+    std::string signin(const std::string& id, const std::string& password, const char userFile []);
 
 #endif

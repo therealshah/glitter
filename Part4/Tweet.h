@@ -12,14 +12,14 @@
 
 
     // Go through the tweet file, find the id, put the tweets
-    std::string getTweets(const std::string& id,const std::string& tweetFile);
+    std::string getTweets(const std::string& id,const char tweetFile []);
     
-    void writeTweet(const std::string& id, const std::string& tweet, const std::string& timestamp,const std::string& tweetFile);
+    void writeTweet(const std::string& id, const std::string& tweet, const std::string& timestamp,const char tweetFile []);
 
     
     
     // This method searches for a particluar person's tweet
-    std::string searchPersonTweet(const std::string& personName, const std::string& tweetFile);
+    std::string searchPersonTweet(const std::string& personName, const char tweetFile []);
 
 
 #endif

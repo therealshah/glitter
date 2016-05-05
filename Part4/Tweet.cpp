@@ -12,7 +12,7 @@ using namespace std;
 
 
 // Go through the tweet file, find the id, put the tweets
-string getTweets(const string& id, const string& tweetFile){
+string getTweets(const string& id, const char tweetFile []){
     string line, idOnFile, tweet;
     ifstream tweetfile(tweetFile);
     if(!tweetfile.is_open())
@@ -35,12 +35,12 @@ string getTweets(const string& id, const string& tweetFile){
     return "notfound"; // not found
 };
 
-void writeTweet(const string& id, const string& tweet, const string& timestamp,const string& tweetFile){
+void writeTweet(const string& id, const string& tweet, const string& timestamp,const char tweetFile []){
     string str, username;
-    char nameOfTweetFile[] = tweetFile;
+    //char nameOfTweetFile[] = tweetFile;
     char tempTweetFile[] = "tweetstemp.txt"; // tempfile to write into
 
-    ifstream in_file(nameOfTweetFile); // Reach from original tweet file
+    ifstream in_file(tweetFile); // Reach from original tweet file
     if(!in_file){ cerr << "Could not open input file for tweets\n";}
     
     ofstream out_file(tempTweetFile); // Write to temp file
@@ -59,10 +59,10 @@ void writeTweet(const string& id, const string& tweet, const string& timestamp,c
     in_file.close();
     out_file.close();
     
-    if( remove( nameOfTweetFile ) != 0 ) // Delete old file
+    if( remove( tweetFile ) != 0 ) // Delete old file
         perror( "Error deleting file" );
     else{
-        if ( rename( tempTweetFile , nameOfTweetFile ) != 0 ) // Replace old file
+        if ( rename( tempTweetFile , tweetFile ) != 0 ) // Replace old file
             perror( "Error renaming file" );
     }
     
@@ -73,7 +73,7 @@ void writeTweet(const string& id, const string& tweet, const string& timestamp,c
 
 
 // This method searches for a particluar person's tweet
-string searchPersonTweet(const string& personName, const string& tweetFile){
+string searchPersonTweet(const string& personName, const char tweetFile []){
     // call the getTweet function on this person
     try{
      

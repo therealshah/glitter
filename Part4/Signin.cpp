@@ -18,9 +18,9 @@ using namespace std;
 
 
 // Function for Signing into Accounts
-string signin(const string& id, const string& password, const string& userfile){
+string signin(const string& id, const string& password, const char userFile []){
     string line, idOnFile, nameOnFile, passOnFile;
-    ifstream userfile(userfile);
+    ifstream userfile(userFile);
     if(!userfile.is_open()){cerr << "Users.txt did not open, Sign in failed \n";}
     
     // Does the ID already exist?

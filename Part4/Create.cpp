@@ -14,10 +14,9 @@ using namespace std;
 // using namespace glitter;
 
 // Function for Creating new accounts
-string create(const string& id, const string& username, const string& password, const string& tweetFile, 
-    const string& friendsFile, const string& userFile){
+string create(const string& id, const string& username, const string& password,  const char tweetFile [], const char userFile [], const char friendFile []){
     string line, token;
-    fstream idfile("users.txt");
+    fstream idfile(userFile);
     if(!idfile.is_open()){cerr<< "Users.txt file did not open, create failed \n";}
     
     // Does the ID already exist? If so mark it and leave nested loop.
@@ -41,20 +40,20 @@ string create(const string& id, const string& username, const string& password, 
     } 
     else {
         // ID doesn't exist, add it.
-        ofstream userFile;
-        userFile.open (userFile,ios::app);
-        userFile << id << ":" << username << ":" << password << "\n";
-        userFile.close();
+        ofstream usersFile;
+        usersFile.open (userFile,ios::app);
+        usersFile << id << ":" << username << ":" << password << "\n";
+        usersFile.close();
         
         // Add them to tweet file
-        ofstream tweetFile;
-        tweetFile.open (userFile,ios::app);
-        tweetFile << id << "\n";
-        tweetFile.close();
+        ofstream tweetsFile;
+        tweetsFile.open (tweetFile,ios::app);
+        tweetsFile << id << "\n";
+        tweetsFile.close();
         
         // Add them to friends file
         ofstream friendsFile;
-        friendsFile.open (friendsFile,ios::app);
+        friendsFile.open (friendFile,ios::app);
         friendsFile << id << "\n";
         friendsFile.close();
         

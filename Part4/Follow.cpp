@@ -18,7 +18,7 @@ using namespace std;
 -- This method gets all the people i am following
 -- Will return an error code if an error occurs otherwise it will return success with the user friends
 */
-string getFollowing(const std::string& username,const string& friendFile){
+string getFollowing(const std::string& username,const char friendFile []){
     
     // open the file for reading and find my username
     ifstream ifs(friendFile); // open the file for reading
@@ -51,7 +51,7 @@ string getFollowing(const std::string& username,const string& friendFile){
     --  makes use of the getFollowing method
 
 */
-string getFollowing(const string& username, const string& personName,const string& friendFile){
+string getFollowing(const string& username, const string& personName,const char friendFile []){
     // call the other getFollowing method to get my followlist
     string followList = getFollowing(username,friendFile);
     // ck if it was sucessfull
@@ -80,14 +80,14 @@ string getFollowing(const string& username, const string& personName,const strin
  -- basically removes the friend from the followlist of username
  
  */
-string unfollow(const string& username,const string& personName,const string& friendFile){
+string unfollow(const string& username,const string& personName,const char friendFile []){
 
     char nameOfTempFile[] = "temp.txt";
-    char nameOfFriendFile[] = friendFile;
+  //  char nameOfFriendFile[] = friendFile;
     string str, idsInFile;
     string output = "success"; // we will also keep track of our friends so we don't have to reopen the file to find our friends
     
-    ifstream in_file(nameOfFriendFile);  // Open the original file to read from
+    ifstream in_file(friendFile);  // Open the original file to read from
     if(!in_file)
         {
             cerr << "Could not open input file for unfollowing a person\n";
@@ -133,12 +133,12 @@ string unfollow(const string& username,const string& personName,const string& fr
     in_file.close();
     out_file.close();
     
-    if( remove( nameOfFriendFile ) != 0 ){ // Delete the old file
-        cerr << "Error deleting file: " << nameOfFriendFile << endl;
+    if( remove( friendFile ) != 0 ){ // Delete the old file
+        cerr << "Error deleting file: " << friendFile << endl;
         return "error";
     }
     else {
-        if ( rename(nameOfTempFile,nameOfFriendFile) !=0) // Rename the new file
+        if ( rename(nameOfTempFile,friendFile) !=0) // Rename the new file
             return "error";
     }
 
@@ -150,11 +150,11 @@ string unfollow(const string& username,const string& personName,const string& fr
 
 
 // Finds all the people that are friends of the username
-string findPeople(const string& myUserName, const string& personName, const string& userFile){
+string findPeople(const string& myUserName, const string& personName, const char userFile []){
     string returnMssg = "success"; // this will hold the return mssg  
     // first read in all of my friends
     unordered_map<string,vector<string>> map; // hold all the followers of a person
-    string myFollowing = getFollowing(myUserName); // get all the people that i am following
+    string myFollowing = getFollowing(myUserName,userFile); // get all the people that i am following
     vector<string> followVect; // this will hold all the people i am following
     istringstream followList(myFollowing); // parse for all of my friends
     string token;
@@ -195,13 +195,13 @@ string findPeople(const string& myUserName, const string& personName, const stri
 
 
 // This method will bascically add the person to the friend vector
-string follow(const string& myUserName, const string& personName,const string& friendFile){
+string follow(const string& myUserName, const string& personName,const char friendFile []){
 
     // we will read from the input file and store in a temp output file. If we encounter the username, we will simply
     // append it's data to the end of the string
-    char inputFile [] = friendFile;
+  //  char inputFile [] = friendFile;
     char outputFile [] = "temp.txt";
-    ifstream inFile(inputFile);
+    ifstream inFile(friendFile);
     if (!inFile){
         cout << "Can't open friends file to follow someone";
         return "error";
@@ -229,12 +229,12 @@ string follow(const string& myUserName, const string& personName,const string& f
     inFile.close();
     outFile.close();
     // now delete the old file (friends.txt) & rename the temp file to friends.txt
-    if (remove(inputFile) != 0){ // delete the old file{
+    if (remove(friendFile) != 0){ // delete the old file{
         cout << "Error deleting the old file in follow\n";
         return "error";
     }
     else{
-        if (rename (outputFile, inputFile) != 0){
+        if (rename (outputFile, friendFile) != 0){
             cout << "Error renaming the temp file in follow\n";
             return "error";
         }

@@ -338,16 +338,16 @@ void thefunction(istringstream& iss,int connfd){
     //cout << "From client: " << theinput << endl;
    //cout << thefunc<<endl;
     // Now we will parse for functionality and call the right function to handle the request
-    const string TWEET_FILE = "tweets_server1.txt";
-    const string USERS_FILE =  "users_server1.txt";
-    const string FRIENDS_FILE =  "friends_server1.txt";
+    char TWEET_FILE [] = "tweets_server1.txt";
+    char  USERS_FILE [] =  "users_server1.txt";
+    char  FRIENDS_FILE [] =  "friends_server1.txt";
 
     if(thefunc == "create"){
         string id, name, password;
         getline(iss,id,':');
         getline(iss,name,':');
         getline(iss,password,':');
-        string output =  create(id,name,password,TWEET_FILE,FRIENDS_FILE,USERS_FILE); // get output
+        string output =  create(id,name,password,TWEET_FILE,USERS_FILE,FRIENDS_FILE); // get output
         finishedTask(output,'w',connfd); // weite
 
     } 

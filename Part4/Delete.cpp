@@ -16,23 +16,23 @@ using namespace std;
 
 
 // This method deletes the user from all files by calling other methods
-string deleteAccount(const string& id, const string& tweetsFile, const string& usersFile, const string& friendFile){
-    char nameOfTweetFile[] = tweetsFile;
-    char nameOfFriendFile[] = usersFile;
-    char nameOfUserFile[] = friendFile;
+string deleteAccount(const string& id, const char tweetsFile [], const char usersFile [], const char friendFile []){
+    // char nameOfTweetFile[] = tweetsFile;
+    // char nameOfFriendFile[] = usersFile;
+    // char nameOfUserFile[] = friendFile;
 
 
     // Clever use of one function to delete everything from a specific file
-    if(!removeIDfromfile(id, nameOfTweetFile)){
+    if(!removeIDfromfile(id, tweetsFile)){
         perror( "Error deleting user from tweets" );
     }
-    if(!removeIDfromfile(id, nameOfFriendFile)){
+    if(!removeIDfromfile(id, usersFile)){
         perror( "Error deleting user from Friend" );
     }
-    if(!removeIDfromfile(id, nameOfUserFile)){
+    if(!removeIDfromfile(id, friendFile)){
         perror( "Error deleting user from User" );
     }
-    if(!removeIdFromYourFollowers(id)){
+    if(!removeIdFromYourFollowers(id,friendFile)){
         perror( "Error deleting user from those following" );
     }
     return "successfulDelete";
@@ -73,12 +73,12 @@ bool removeIDfromfile(const string& clientID, const char theFile[]){
 // This method removes your ID from everyone following you
 // The file is copied over without any instance of the clientID in parameter
 // A 1 is returned if the process is successful
-bool removeIdFromYourFollowers(const string& clientID,const string& friendsFile){
+bool removeIdFromYourFollowers(const string& clientID,const char friendsFile []){
     char nameOfTempFile[] = "temp.txt";
-    char nameOfFriendFile[] = friendsFile;
+   // char nameOfFriendFile[] = friendsFile;
     string str, idsInFile;
     
-    ifstream in_file(nameOfFriendFile);  // Open the original file to read from
+    ifstream in_file(friendsFile);  // Open the original file to read from
     if(!in_file){
             cerr << "Could not open input file for tweets\n";
             return 0;
@@ -103,10 +103,10 @@ bool removeIdFromYourFollowers(const string& clientID,const string& friendsFile)
     in_file.close();
     out_file.close();
     
-    if( remove( nameOfFriendFile ) != 0 ) // Delete the old file
-        cerr << "Error deleting file: " << nameOfFriendFile << endl;
+    if( remove( friendsFile ) != 0 ) // Delete the old file
+        cerr << "Error deleting file: " << friendsFile << endl;
     else {
-        if ( rename(nameOfTempFile,nameOfFriendFile) ==0) // Rename the new file
+        if ( rename(nameOfTempFile,friendsFile) ==0) // Rename the new file
             return 1; // Everything worked!
         else
             cerr << "Error renaming file: " << nameOfTempFile << endl;

@@ -3,6 +3,7 @@ import os, socket
 from datetime import datetime
 from flask import g
 
+
 class CounterWrapper:
   def __init__(self):
     self.counter = 0
@@ -11,20 +12,26 @@ class CounterWrapper:
     self.counter = self.counter+ 1
     return self.counter
 
-    
-def get_user():
-    user = getattr(g, 'user', None)
-    if user is None:
-        user = fetch_current_user_from_database()
-        g.user = user
-    return user
 
 def get_request_counter():
     counter = getattr(g, 'rCounter', None)
     if counter is None: # if it doesn't exist already
+        print 'intializing'
+        ctx = app.app_context()
         counter =  CounterWrapper()
         g.rCounter = counter
-    return counter.increment_request() # return the 0 counter
+        ctx.push()
+    return counter.increment_request()
+
+def initial_counter():
+  ctx = app.app_context()
+  g.counter = 0
+  ctx.push()
+  print 'intializing ',Flask.g.counter
+
+def get_counter():
+  g.counter = g.counter + 1
+  print g.counter
 
 
 app = Flask(__name__)
@@ -61,7 +68,6 @@ def login_page():
   # ck if the user is in the session
   if 'userName' in session:
     return redirect(url_for('homePage')) # simply just redirect to the homepage of the user
-  
   # If the user sends back a request( either log in or create a new account)
   if request.method == 'POST':
     # ck which type of response it was
@@ -366,6 +372,7 @@ def servercomm(input):
        
   #print 'Ip address of ' + host + ' is ' + remote_ip
   print "Request = ",  get_request_counter() # request counter
+
   s = socket.socket() # Create socket object
   s.connect((host, port))
   #print "the input:" + input

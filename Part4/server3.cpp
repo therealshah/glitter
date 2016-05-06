@@ -17,11 +17,7 @@
 #include <sstream>
 #include <cstring>
 #include <string>
-//#include <stdio.h>       // perror, snprintf
-//#include <stdlib.h>      // exit
 #include <unistd.h>      // close, write
-//#include <string.h>      // strlen
-//#include <strings.h>     // bzero
 #include <time.h>        // time, ctime
 #include <sys/socket.h>  // socket, AF_INET, SOCK_STREAM,
 // bind, listen, accept
@@ -43,7 +39,8 @@ using namespace std;
 #define	BUFFSIZE	8192    // buffer size for reads and writes
 #define  SA struct sockaddr
 #define	LISTENQ		1024	// 2nd argument to listen()
-#define PORT_NUM        13002
+#define PORT_NUM        13004
+#define FILE_NUM 1
 
 void thefunction(istringstream& iss,int connfd);
 void manageQueue(); // thread function
@@ -57,21 +54,25 @@ bool isWriteHap = false;
 mutex readLock; // used for the reads to increment the counter
 mutex writeLock; // used to ck if writes are happening
 mutex queueLock; // used to lock the queue
+mutex sequenceLock; // used to lock the seq ##
 condition_variable isEmpty; // used for the bouncer thread
 condition_variable doneWriting; // used to signal bouncer that read/write that a write has ended
 condition_variable doneReading; // used to signal only the write that all reads are DONE
 
+vector<int> serverList = {13002,13003,13004}; // all the servers
 
 
-
+int mySeq;
 
 int main(int argc, char **argv) {
+
+    // READ MYSEQ FROM FILE
 
     int			listenfd, connfd;  // Unix file descriptors
     struct sockaddr_in	servaddr;          // Note C use of struct
    // char      buff[MAXLINE];
     time_t      ticks;
-  
+    
     
     // 1. Create the socket
     if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -140,19 +141,6 @@ int main(int argc, char **argv) {
 
         // string theoutput = thefunction(thingy);
         memset(thingy, 0, sizeof thingy); // Need to clear the buffer after use
-
-        // snprintf(buff, sizeof(buff), "%s", theoutput.c_str());
-        // printf(buff);
-        // int len = strlen(buff);
-        // if (len != write(connfd, buff, strlen(buff))) {
-        //     perror("write to connection failed");
-        // }
-        
-        // // 6. Close the connection with the current client and go back
-        // //    for another.
-        // close(connfd);
-        // memset(buff, 0, sizeof buff); // Need to clear the buffer after use
-
  
     }
 }
@@ -325,6 +313,37 @@ void finishedTask(const string& theoutput, char type, int connfd){
     }
 }
 
+/*----------------------------------------------------------------------------
+    -- This function is passed in the request that was receieved from the client
+    -- Everything is split by a ':' (Colon)
+    -- Checks whther its a replication from a another server
+        -- if yes
+            -- Is it a catch up request?
+                if yes 
+                    - send neg ack and ask for queue
+                -- if no
+                     -- im caught up and just update process
+        -- if not a replication req,
+            -- its a front end req and this dude a primary
+------------------------------------------------------------------------------*/
+// void isReplicate(istringstream& iss,int connfd){
+//     // requestType:sequence:funcType:etc
+//     string requestType; // it is a replicate req
+//     string sequenceNum;
+//     getline(iss,requestType,':');
+//     getline(iss,sequenceNum,':');
+
+//     // pro
+//     if (requestType == "Flask")
+//         thefunc(iss,connfd);
+//     else if (requestType == "Replicate"){
+//         // ck my sequence is correct
+//         unique_lock.
+//     }
+
+
+// }
+
 
 /*----------------------------------------------------------------------------
     -- This function is passed in the request that was receieved from the client
@@ -333,14 +352,19 @@ void finishedTask(const string& theoutput, char type, int connfd){
 ------------------------------------------------------------------------------*/
 void thefunction(istringstream& iss,int connfd){
     string thefunc;
+    string sequenceNum;
+
     // istringstream iss(theinput);
+    // sequenceNum:funcType:
+    getline(iss,sequenceNum,':');
     getline(iss,thefunc,':');
+
     //cout << "From client: " << theinput << endl;
    //cout << thefunc<<endl;
     // Now we will parse for functionality and call the right function to handle the request
-    char TWEET_FILE [] = "tweets_server1.txt";
-    char  USERS_FILE [] =  "users_server1.txt";
-    char  FRIENDS_FILE [] =  "friends_server1.txt";
+    char TWEET_FILE [] = "tweets_server3.txt";
+    char  USERS_FILE [] =  "users_server3.txt";
+    char  FRIENDS_FILE [] =  "friends_server3.txt";
 
     if(thefunc == "create"){
         string id, name, password;

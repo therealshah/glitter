@@ -11,12 +11,6 @@ using namespace std;
 
 
 
-
-
-
-
-
-
 // Function for Signing into Accounts
 string signin(const string& id, const string& password, const char userFile []){
     string line, idOnFile, nameOnFile, passOnFile;

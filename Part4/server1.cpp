@@ -58,9 +58,12 @@ bool isWriteHap = false;
 mutex readLock; // used for the reads to increment the counter
 mutex writeLock; // used to ck if writes are happening
 mutex queueLock; // used to lock the queue
+mutex sequenceNumberLock; // used to lock the sequence number
 condition_variable isEmpty; // used for the bouncer thread
 condition_variable doneWriting; // used to signal bouncer that read/write that a write has ended
 condition_variable doneReading; // used to signal only the write that all reads are DONE
+condition_variable doneSequence; // used tp signal when im done cking seq thingy
+
 
 vector<int> serverList = {13002,13003,13004}; // all the servers
 int mySeq;
@@ -100,6 +103,8 @@ int main(int argc, char **argv) {
         perror("Unable to bind port");
         exit(2);
     }
+
+
     
     // 4. Tell the system that we are going to use this sockect for
     //    listening and request a queue length
@@ -151,6 +156,80 @@ int main(int argc, char **argv) {
 }
 
 
+/* This function is uses the queue of requests and updates to the Seq num it should be
+*/
+void catchup (istringstream& iss){
+    unique_lock<mutex> wl(writeLock); // acquire the writelock so everything is blocked     
+
+    // iss = "seq,w,command|seq,w,command|...."
+    string request;
+    while(getline(iss,request,'|'){ // for each request 
+        string sequenceNum, write;
+        getline(iss,sequenceNum,':'); // get seq number
+        getline(iss,write,':'); // 'w' not needed throw out
+        int sequence = atoi(sequenceNum); 
+        if (mySeq > sequenceNum){ // only call the function if its a later request
+            thefunction(iss,-1); // -1 tell func to not respond to connfd number
+            mySeq++;
+        }
+    }
+}
+
+
+/* give flask negative acknowledgement 
+    wait for the updated queue
+    process the queue
+    call it a day
+*/
+void sendNegative(int newSeq, int connfd){
+    char buff[MAXLINE];
+    snprintf(buff, sizeof(buff), "%s", ("negative").c_str()); // store the output into the buffer
+       // printf(buff);
+    int len = strlen(buff);
+    if (len != write(connfd, buff, strlen(buff))) {
+        perror("write to connection failed");
+    }
+    memset(buff,0, sizeof buff);
+    read(connfd,buff,MAXLINE);
+    istringstream iss(buff);
+    catchup(iss);
+
+        
+}
+
+
+
+/*----------------------------------------------------------------------------
+    -- This function takes in
+        -- newSeq- number of the new request type
+        -- connfd - connection
+        -- requestType - either r or w
+
+    If the newSeq is less than our seq, that implies we have already processed it, so ignore
+    if the newSeq = our and its a read req, let it slide
+    if the newSeq = ourSeq + 1 and write, then let it through
+    otherwise we are behind meaning we crashed and are recovering
+------------------------------------------------------------------------------*/
+bool checkSequenceNumber(int newSeq,int connfd, const string& requestType){
+
+
+    unique_lock<mutex> sl(sequenceNumberLock); //get seq # lock
+    // basically a check. We dont wanna prcess the past request because we already have done it
+    if (newSeq < sequenceNumber)
+        return false;
+    else if (newSeq == sequenceNumber && requestType == "r") // if same seq and r, we good
+        return true;
+    else if (sequenceNumber + 1 == newSeq && requestType == "w") // if correct seq & w, we good
+        return true;
+    else if (sequenceNumber + 1 < newSeq){// we are behind
+        sendNegative(newSeq, connfd);
+        return false;
+    } 
+    else
+        return false;
+}
+
+
 /*----------------------------------------------------------------------------
     -- This function is is basically used by he bouncer thread
     -- Manages reeads/writrs
@@ -174,21 +253,30 @@ void manageQueue(){
         } 
         // now ck the front of the queue
         cout << "ManageQueue:We woke up. Popping from qeueu\n";
-        auto req = line.front(); // get the top element
+        auto req = line.front(); // get the top element {thingy(AKA the request), connfd}
         line.pop(); // pops the element
         ul.unlock(); // unlock to all the main to push more requests
         cout << "ManageQueue:Unlocked the queue\n";
         // now ck if the request can go
         istringstream iss(req.first); // get the string and make a stringstream
         string requestType; // ck if read or write request
-        getline(iss,requestType,':'); 
+        string seq;
+
+        getline(iss,seq,':'); // read seq number
+        getline(iss,requestType,':');  // read requesttype
+        int sequenceNumber = atoi(seq); //convert seq to int
+
+        bool check = checkSequenceNumber(sequence,req.second, requestType); // basically ck if we are caught up
         /*---------------------------------
              -- if it's a read type:
                 1. Ck if there's a write
                 2. If yes, sleep until no write
                 3. otherwise, incremenet count and go
+
+            only process these requests if are not catching up
+            if we were catching up, we would already have processed this req
         ------------------------------------*/ 
-        if (requestType == "r"){
+        if (requestType == "r" && check){
             cout << "ManageQueue:Read request\n";
             cout << "Getting write lock\n";
             wl.lock(); // get write lock and increment ur count
@@ -214,7 +302,7 @@ void manageQueue(){
             1. Ck the counter, and see if there are any reads
             2. sleep until no reads
         ------------------------------------*/ 
-        else{
+        else if (check){
             cout << "ManageQueue:Write request\n";
             cout << "ManageQueue:Getting write lock\n";
             wl.lock(); // make sure no other write AND READ can access the files
@@ -232,12 +320,7 @@ void manageQueue(){
                 cout << "ManageQueue:Waking up on read signal\n";
  
             } 
-            // while (readCounter != 0){
-            //     // unlock, sleep fir a bit and try again
-            //     readLock.unlock();
-            //     this_thread::sleep_for(chrono::milliseconds(100)); // sleep
-            //     readLock.lock(); // acquire the lock before we access SHARED RESCOURCE
-            // }
+
             isWriteHap = true; // we are writing now
             // unlock the read and write and go
             rl.unlock();
@@ -265,6 +348,58 @@ void manageQueue(){
 ------------------------------------------------------------------------------*/
 void replicate(const string& command){
 
+    for (int conn : serverList){
+        openSocket();
+    }
+
+}
+
+
+
+/*----------------------------------------------------------------------------
+    -- This function 
+------------------------------------------------------------------------------*/
+void openSocket(){
+
+    int sockfd, portno, n;
+    struct sockaddr_in serv_addr;
+    struct hostent *server;
+
+    char buffer[256];
+    if (argc < 3) {
+       fprintf(stderr,"usage %s hostname port\n", argv[0]);
+       exit(0);
+    }
+    portno = atoi(argv[2]); // this is our port #
+    sockfd = socket(AF_INET, SOCK_STREAM, 0); // create a socket
+    if (sockfd < 0) 
+        error("ERROR opening socket");
+    server = gethostbyname(argv[1]); // 127.0.0.1
+    if (server == NULL) {
+        fprintf(stderr,"ERROR, no such host\n");
+        exit(0);
+    }
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    bcopy((char *)server->h_addr, 
+         (char *)&serv_addr.sin_addr.s_addr,
+         server->h_length);
+    serv_addr.sin_port = htons(portno);
+    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
+        error("ERROR connecting");
+    printf("Please enter the message: ");
+    bzero(buffer,256);
+    fgets(buffer,255,stdin);
+    n = write(sockfd,buffer,strlen(buffer));
+    if (n < 0) 
+         error("ERROR writing to socket");
+    bzero(buffer,256);
+    n = read(sockfd,buffer,255);
+    if (n < 0) 
+         error("ERROR reading from socket");
+    printf("%s\n",buffer);
+    close(sockfd);
+    return 0;
 }
 
 /*----------------------------------------------------------------------------
@@ -280,7 +415,7 @@ void replicate(const string& command){
 void finishedTask(const string& theoutput, char type, int connfd,const string& command = "empty"){
     // if read, decrement counter
     // if read counter is 0, signal doneReading
-
+    if (connfd == -1) return;
 
     if (type == 'r'){
         cout << "FinishedTask:Getting read lock\n";
@@ -310,10 +445,13 @@ void finishedTask(const string& theoutput, char type, int connfd,const string& c
 
         // only multicast if its not a direct command from FE
         // if command == empty => implies primary
-        mySeq++;
-        command = "replicate:" + mySeq + ":" + command; // type is request and append seq #
-        if (command != "empty")
+        mySeq++;// increment my seq #
+
+        if (command != "empty"){
+            command = "replicate:" + mySeq + ":" + command; // type is request and append seq #
             replicate(command);
+        }
+
         unique_lock<mutex> wl(writeLock);
         // if we are the last read, signal and unlock
         isWriteHap = false; // no more writes
@@ -348,12 +486,12 @@ void finishedTask(const string& theoutput, char type, int connfd,const string& c
     -- Everything is split by a ':' (Colon)
     -- The first field is the action the server wants and afyer that the data (most likely the userID or search fields)
 ------------------------------------------------------------------------------*/
-void thefunction(istringstream& orgIss,int connfd,bool replicate = false){
+void thefunction(istringstream& iss,int connfd,bool replicate = false){
 
     // get whole string which will be used to multicast
-    string command;
-    getline(orgIss,command); // this basically reads the whole string
-    istringstream iss(command); // make a new stringsteam with the command., this way we have the orignal command
+    // string command;
+    // getline(orgIss,command); // this basically reads the whole string
+    // istringstream iss(command); // make a new stringsteam with the command., this way we have the orignal command
 
     string thefunc;
     getline(iss,thefunc,':');

@@ -8,30 +8,38 @@ class CounterWrapper:
   def __init__(self):
     self.counter = 0
 
-  def increment_request(self):
+  def increment_counter(self):
     self.counter = self.counter+ 1
+
+  def get_counter(self):
     return self.counter
 
 
-def get_request_counter():
-    counter = getattr(g, 'rCounter', None)
-    if counter is None: # if it doesn't exist already
-        print 'intializing'
-        ctx = app.app_context()
-        counter =  CounterWrapper()
-        g.rCounter = counter
-        ctx.push()
-    return counter.increment_request()
+def get_request_counter(isWrite):
+  counter = getattr(g, 'rCounter', None)
+  if counter is None: # if it doesn't exist already
+      print 'intializing'
+      ctx = app.app_context()
+      counter =  CounterWrapper()
+      g.rCounter = counter
+      g.rQueue = {}
+      ctx.push()
+  if isWrite : 
+    counter.increment_counter()
+  return counter.get_counter()
 
-def initial_counter():
-  ctx = app.app_context()
-  g.counter = 0
-  ctx.push()
-  print 'intializing ',Flask.g.counter
 
-def get_counter():
-  g.counter = g.counter + 1
-  print g.counter
+def push_queue(request,sequenceNum):
+  theQueue = getattr(g, 'rQueue', None)
+  if theQueue is None: # if it doesn't exist already
+    print("FAILURE, QUIT LIFE")
+  theQueue[sequenceNum] = request
+
+def get_queue(sequenceNum):
+  theQueue = getattr(g, 'rQueue', None)
+  if theQueue is None: # if it doesn't exist already
+    print("FAILURE, QUIT LIFE")
+  return theQueue
 
 
 app = Flask(__name__)
@@ -41,6 +49,8 @@ users = {} # this holds all the users Stored as {userid, {username,password}}
 userTweets = {} # holds all the tweets of all the users
 listStuff = [] # holds this users tweets
 userFriends = {} # holds all the friends of the user
+
+serverports = {13002:0, 13003:0, 13004:0} # list of all serverports and current sequence number 
 
 
 #172.16.30.242:59284
@@ -361,27 +371,58 @@ def checkLogIn():
 # The server handles the request and sends back the code
 # The information is returned as: StatusCode:UserID:STUFF(could be friend list,tweets etc)
 def servercomm(input):
-  print 'yolo'
-  try:
-    remote_ip = socket.gethostbyname( host )
- 
-  except socket.gaierror:
-      #could not resolve
-      print 'Hostname could not be resolved. Exiting'
-      sys.exit()
-       
-  #print 'Ip address of ' + host + ' is ' + remote_ip
-  print "Request = ",  get_request_counter() # request counter
+  if input[0] == 'w':
+    isWrite = 1
+  else:
+    isWrite = 0
+  flaskSequence = get_request_counter(isWrite); # if read just get num, if write update & get num
+  if isWrite ==1 :
+    push_queue(input,flaskSequence)
 
-  s = socket.socket() # Create socket object
-  s.connect((host, port))
-  #print "the input:" + input
-  s.send(input)
-  serveroutput = (s.recv(1024)).split(":")
-  #print "IN server"
-  # print serveroutput
-  s.close
+  for port,sequenceNum in serverports.iteritems():
+    # go through all the ports and multicast
+    try:
+      remote_ip = socket.gethostbyname( host)
+   
+    except socket.gaierror:
+        #could not resolve
+        print 'Hostname could not be resolved. Exiting'
+        sys.exit()
+
+
+    s = socket.socket() # Create socket object
+    s.timeout(5)
+    s.connect((host, port))
+    #print "the input:" + input
+    input = flaskSequence + ":" + input 
+    s.send(input)
+    serveroutput = (s.recv(1024)).split(":")
+
+    # if the server sends back a negative, it is behind the sequence number
+    # serveroutput[1] = the currrent sequence number of the server
+    # send back the queue with all the sequence numbers
+    if serveroutput[0] == "negative" :
+      response = serializedQueue(serveroutput[1],flaskSequence)
+      s.send(response)
+
+    else: # positive 
+      serverports[port] = flaskSequence
+
+    s.close
   return serveroutput
+
+# this gets the sequence number of the server and sends back all the requests
+# from that number to the current flaskSequence number 
+def serializedQueue(serverSequenceNumber,flaskSequence):
+  theQueue = get_queue()
+  theSerializedQueue = ""
+  i = int(serverSequenceNumber)
+  while i < flaskSequence :
+    theSerializedQueue = theSerializedQueue + "|" + theQueue[i]
+    i+=1;
+  return theSerializedQueue
+
+
 
 @app.route('/delete', methods = ['post','get'])
 def deleteAccount():
@@ -392,7 +433,7 @@ def deleteAccount():
   except KeyError:
     print("Redirect, Not Logged In")
     return redirect(url_for('login_page'))
-  servercomm("w:delete:"+session['userName'])  #Delete all existance from the server
+  servercomm("w:delete:"+session['userName'])  #Delete all existance from enthe server
   return redirect(url_for('logout'))
 
 

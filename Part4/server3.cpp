@@ -205,19 +205,25 @@ void writeSeqNumber(){
 void catchup (istringstream& iss){
     unique_lock<mutex> wl(writeLock); // acquire the writelock so everything is blocked     
 
+    cout << "In catchup\n";
     // iss = "seq,w,command|seq,w,command|...."
     string request;
-    while(getline(iss,request,'|')){ // for each request 
+    cout << "Before while loop "<<iss.str()<<endl;
+    while(getline(iss,request,';')){ // for each request 
+        cout << "After first parse " << iss.str() <<endl;
+        cout << "Handling: "<< request <<endl;
         string sequenceNum, write;
-        getline(iss,sequenceNum,':'); // get seq number
-        getline(iss,write,':'); // 'w' not needed throw out
+        istringstream reqIss(request); // make a stringstream for this request
+        getline(reqIss,sequenceNum,':'); // get seq number
+        getline(reqIss,write,':'); // 'w' not needed throw out
+        cout << "sequenceNumber " << sequenceNum<<endl;
         int sequence = stoi(sequenceNum); 
-        if (mySeq > sequence){ // only call the function if its a later request
-            thefunction(iss,-1); // -1 tell func to not respond to connfd number
+        if (mySeq < sequence){ // only call the function if its a later request
+            cout << "in here\n";
+            thefunction(reqIss,-1); // -1 tell func to not respond to connfd number
             mySeq++;
         }
     }
-
     // write the updated seqNumber to the file
     writeSeqNumber();  // note we already have the lock when we went in this function
 }
@@ -230,9 +236,12 @@ void catchup (istringstream& iss){
 */
 void sendNegative(int connfd){
     char buff[MAXLINE];
-    string output = "negative";
+    memset(buff,0, sizeof buff);
+    string output = "negative:"+ to_string(mySeq);
+    cout << "The output " << output<<endl;
     snprintf(buff, sizeof(buff), "%s", output.c_str()); // store the output into the buffer
-       // printf(buff);
+    cout << "Printing buff\n";
+    printf(buff);
     int len = strlen(buff);
     if (len != write(connfd, buff, strlen(buff))) {
         perror("write to connection failed");
@@ -240,6 +249,7 @@ void sendNegative(int connfd){
     memset(buff,0, sizeof buff);
     read(connfd,buff,MAXLINE);
     istringstream iss(buff);
+    cout << "Catching up\n";
     catchup(iss);
    
 }
@@ -314,6 +324,8 @@ void manageQueue(){
         int sequenceNumber = stoi(seq); //convert seq to int
 
         bool check = checkSequenceNumber(sequenceNumber,req.second, requestType); // basically ck if we are caught up
+        cout << "Check returned :" << check<<endl;
+
         /*---------------------------------
              -- if it's a read type:
                 1. Ck if there's a write

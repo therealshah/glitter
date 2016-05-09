@@ -2,45 +2,54 @@ from flask import Flask,render_template, request, redirect,url_for, session
 import os, socket
 from datetime import datetime
 from flask import g
+import errno
 
 
-
-class CounterWrapper:
+#This is a wwrapper to store the seq # and the queue
+# SO it can be accessed through the g context of flask (shared amongst users)
+class GlobalWrapper:
   def __init__(self):
-    self.counter = 0
+    self.counter = 0 # global counter
+    self.queue = {} # this is the request queue
 
   def increment_counter(self):
+    print 'Incrementing counter '
     self.counter = self.counter+ 1
 
   def get_counter(self):
     return self.counter
+  def push_request(self,sequenceNum,request):
+    self.queue[sequenceNum] = str(sequenceNum) + ":" + request # store the request in the map along with the counter
+  def get_queue(self):
+    return self.queue # return the queue list
 
 
 def get_request_counter(isWrite):
-  counter = getattr(g, 'rCounter', None)
-  if counter is None: # if it doesn't exist already
-      print 'intializing'
+  globalVar = getattr(g, 'rGlobals', None)
+  if globalVar is None: # if it doesn't exist already
+      print 'intializing in get_request_counter'
       ctx = app.app_context()
-      counter =  CounterWrapper()
-      g.rCounter = counter
-      g.rQueue = {}
+      globalVar =  GlobalWrapper() # if it doesnt exist, create a new globalWrapper and store in the g context
+      g.rGlobals = globalVar # store in the global context
       ctx.push()
-  if isWrite : 
-    counter.increment_counter()
-  return counter.get_counter()
+  #emp = 
+  if isWrite : # only increment the counter if its a write request
+    globalVar.increment_counter()
+  return globalVar.get_counter()
 
 
 def push_queue(request,sequenceNum):
-  theQueue = getattr(g, 'rQueue', None)
-  if theQueue is None: # if it doesn't exist already
+  globalVar = getattr(g, 'rGlobals', None)
+  if globalVar is None: # if it doesn't exist already
     print("FAILURE, QUIT LIFE")
-  theQueue[sequenceNum] = request
+  globalVar.push_request(sequenceNum,request)
+
 
 def get_queue(sequenceNum):
-  theQueue = getattr(g, 'rQueue', None)
-  if theQueue is None: # if it doesn't exist already
+  globalVar = getattr(g, 'rGlobals', None)
+  if globalVar is None: # if it doesn't exist already
     print("FAILURE, QUIT LIFE")
-  return theQueue
+  return globalVar.get_queue()
 
 
 app = Flask(__name__)
@@ -379,7 +388,8 @@ def servercomm(input):
   else:
     isWrite = 0
   flaskSequence = get_request_counter(isWrite); # if read just get num, if write update & get num
-  if isWrite ==1 :
+  if isWrite ==1:
+    print 'Pushing request in queue'
     push_queue(input,flaskSequence)
 
   serveroutput = "" # used to hold the response
@@ -404,35 +414,46 @@ def servercomm(input):
       tempInput = str(flaskSequence) + ":" + input # put our seq # in for the flask seq
       print "input = " + tempInput
       s.send(tempInput)
-      serveroutput = (s.recv(1024)).split(":")
+      tempOutput = (s.recv(1024)).split(":")
 
       # if the server sends back a negative, it is behind the sequence number
       # serveroutput[1] = the currrent sequence number of the server
       # send back the queue with all the sequence numbers
-      print "============ ",serveroutput
-      if serveroutput[0] == "negative" :
-        print "============ ", serveroutput
-        response = serializedQueue(serveroutput[1],flaskSequence)
+      #print "============ ",serveroutput
+      if tempOutput[0] == "negative" :
+        #print "============ ", serveroutput
+        print 'Inside negative'
+        response = serializedQueue(tempOutput[1],flaskSequence)
+        #print "Sending queue back to the server " + response
         s.send(response)
         serverports[port] = flaskSequence # we are updating the vectorClock
-   
-
+  
       else: # positive 
         serverports[port] = flaskSequence # we are updating the vectorClock
-
+        serveroutput = tempOutput
       s.close
     except socket.timeout:
-      print 'Server died '
+      print 'Server timed out '
+    except socket.error as serr:
+      if serr.errno == errno.ECONNREFUSED:
+        print 'Server died'
+
+  if not serveroutput:
+    serveroutput = ["FAILURE"] # if its empty, something was wrong, so display error message
+    print 'Setting serveroutput'
   return serveroutput
 
 # this gets the sequence number of the server and sends back all the requests
 # from that number to the current flaskSequence number 
 def serializedQueue(serverSequenceNumber,flaskSequence):
-  theQueue = get_queue() # get the queue from the g variable
+  theQueue = get_queue(flaskSequence) # get the queue from the g variable
   theSerializedQueue = ""
   i = int(serverSequenceNumber)
-  while i < flaskSequence :
-    theSerializedQueue = theSerializedQueue + "|" + theQueue[i] # append each request to the queue
+  while i <= flaskSequence :
+    if not theSerializedQueue:
+      theSerializedQueue = theQueue[i] #just store the string if it's the first one. We dont want the | in the first req
+    else:
+      theSerializedQueue = theSerializedQueue + ";" + theQueue[i] # append each request to the queue
     i+=1;
   return theSerializedQueue
 
@@ -462,4 +483,5 @@ def force():
 
 if __name__ == '__main__':
   app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT' # this is the key used for the session
+  PRESERVE_CONTEXT_ON_EXCEPTION = False
   app.run("127.0.0.1",1300,debug = True)

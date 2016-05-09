@@ -39,16 +39,18 @@ using namespace std;
 
 
 
-#define	MAXLINE		4096	// max text line length
-#define	BUFFSIZE	8192    // buffer size for reads and writes
+#define MAXLINE     4096    // max text line length
+#define BUFFSIZE    8192    // buffer size for reads and writes
 #define  SA struct sockaddr
-#define	LISTENQ		1024	// 2nd argument to listen()
+#define LISTENQ     1024    // 2nd argument to listen()
 #define PORT_NUM        13003
 #define FILE_NUM 1
 
 void thefunction(istringstream& iss,int connfd);
 void manageQueue(); // thread function
 void finishedTask(const string& theoutput, char type, int connfd);
+void readSeqNumber();
+void writeSeqNumber();
 
 // THIS IS FOR CONCURRENCY
 // queue<pair<istringstream,int>> line; // used to manage read/writes
@@ -58,18 +60,27 @@ bool isWriteHap = false;
 mutex readLock; // used for the reads to increment the counter
 mutex writeLock; // used to ck if writes are happening
 mutex queueLock; // used to lock the queue
+mutex sequenceNumberLock; // used to lock the sequence number
 condition_variable isEmpty; // used for the bouncer thread
 condition_variable doneWriting; // used to signal bouncer that read/write that a write has ended
 condition_variable doneReading; // used to signal only the write that all reads are DONE
+condition_variable doneSequence; // used tp signal when im done cking seq thingy
 
 
 vector<int> serverList = {13002,13003,13004}; // all the servers
+int mySeq;
+bool isReplcating = false; // used to ck if we are multicast
+
+
+
+
+
 
 
 int main(int argc, char **argv) {
 
-    int			listenfd, connfd;  // Unix file descriptors
-    struct sockaddr_in	servaddr;          // Note C use of struct
+    int         listenfd, connfd;  // Unix file descriptors
+    struct sockaddr_in  servaddr;          // Note C use of struct
    // char      buff[MAXLINE];
     time_t      ticks;
   
@@ -88,13 +99,15 @@ int main(int argc, char **argv) {
     servaddr.sin_family      = AF_INET; // Specify the family
     // use any network card present
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port        = htons(PORT_NUM);	// daytime server
+    servaddr.sin_port        = htons(PORT_NUM); // daytime server
     
     // 3. "Bind" that address object to our listening file descriptor
     if (::bind(listenfd, (SA *) &servaddr, sizeof(servaddr)) == -1) {
         perror("Unable to bind port");
         exit(2);
     }
+
+
     
     // 4. Tell the system that we are going to use this sockect for
     //    listening and request a queue length
@@ -102,7 +115,8 @@ int main(int argc, char **argv) {
         perror("Unable to listen");
         exit(3);
     }
-
+    // read the sequence number from the file
+    readSeqNumber();
     thread bouncer(manageQueue); // bounder for the read/write
     unique_lock<mutex> ql(queueLock,defer_lock); // set up unique lock for queue lock, but dont lock now
     
@@ -146,6 +160,123 @@ int main(int argc, char **argv) {
 }
 
 
+
+/*----------------------------------------------------------------------------
+    -- This function basically reads in the sequence number from the file
+    -- Note no need to acquire locks here because this is before any of the locking
+    -- stuff
+------------------------------------------------------------------------------*/
+void readSeqNumber(){
+
+    ifstream ifs("server2_seq.txt"); // open the file 
+    if (!ifs){
+        cerr << "Can't open file: Server2_seq.txt";
+        exit(0);
+    }
+    ifs >> mySeq; // read the int to the mySeq variable
+    ifs.close();
+}
+
+
+/*----------------------------------------------------------------------------
+    -- This function basically just writes the updated version of seq to the file
+    -- Note. precondition - Must have seqLock before this method is called
+------------------------------------------------------------------------------*/
+void writeSeqNumber(){
+
+    ofstream ofs;
+    ofs.open("server2_seq.txt", ios::trunc); // open the file and overwrite its content
+    if (!ofs){
+        cerr << "Can't open file for writing: Server2_seq.txt";
+        exit(0);
+    }
+
+    ofs<<mySeq; // write the new seq #
+
+    ofs.close();
+
+}
+
+
+
+
+/* This function is uses the queue of requests and updates to the Seq num it should be
+*/
+void catchup (istringstream& iss){
+    unique_lock<mutex> wl(writeLock); // acquire the writelock so everything is blocked     
+
+    // iss = "seq,w,command|seq,w,command|...."
+    string request;
+    while(getline(iss,request,'|')){ // for each request 
+        string sequenceNum, write;
+        getline(iss,sequenceNum,':'); // get seq number
+        getline(iss,write,':'); // 'w' not needed throw out
+        int sequence = stoi(sequenceNum); 
+        if (mySeq > sequence){ // only call the function if its a later request
+            thefunction(iss,-1); // -1 tell func to not respond to connfd number
+            mySeq++;
+        }
+    }
+
+    // write the updated seqNumber to the file
+    writeSeqNumber();  // note we already have the lock when we went in this function
+}
+
+
+/* give flask negative acknowledgement 
+    wait for the updated queue
+    process the queue
+    call it a day
+*/
+void sendNegative(int connfd){
+    char buff[MAXLINE];
+    string output = "negative";
+    snprintf(buff, sizeof(buff), "%s", output.c_str()); // store the output into the buffer
+       // printf(buff);
+    int len = strlen(buff);
+    if (len != write(connfd, buff, strlen(buff))) {
+        perror("write to connection failed");
+    }
+    memset(buff,0, sizeof buff);
+    read(connfd,buff,MAXLINE);
+    istringstream iss(buff);
+    catchup(iss);
+   
+}
+
+
+
+/*----------------------------------------------------------------------------
+    -- This function takes in
+        -- newSeq- number of the new request type
+        -- connfd - connection
+        -- requestType - either r or w
+
+    If the newSeq is less than our seq, that implies we have already processed it, so ignore
+    if the newSeq = our and its a read req, let it slide
+    if the newSeq = ourSeq + 1 and write, then let it through
+    otherwise we are behind meaning we crashed and are recovering
+------------------------------------------------------------------------------*/
+bool checkSequenceNumber(int newSeq,int connfd, const string& requestType){
+
+
+    unique_lock<mutex> sl(sequenceNumberLock); //get seq # lock
+    // basically a check. We dont wanna prcess the past request because we already have done it
+    if (newSeq < mySeq)
+        return false;
+    else if (newSeq == mySeq && requestType == "r") // if same seq and r, we good
+        return true;
+    else if (mySeq + 1 == newSeq && requestType == "w") // if correct seq & w, we good
+        return true;
+    else if (mySeq + 1 < newSeq){// we are behind
+        sendNegative(connfd);
+        return false;
+    } 
+    else
+        return false;
+}
+
+
 /*----------------------------------------------------------------------------
     -- This function is is basically used by he bouncer thread
     -- Manages reeads/writrs
@@ -154,7 +285,7 @@ int main(int argc, char **argv) {
     -- after all reads are gone
 ------------------------------------------------------------------------------*/
 void manageQueue(){
-    vector<thread> vect;
+    //vector<thread> vect;
     unique_lock<mutex> ul(queueLock,defer_lock); // set up the unique lock, but don't lock right now
     unique_lock<mutex> wl(writeLock,defer_lock); // for write lock
     unique_lock<mutex> rl(readLock, defer_lock); // for read lock
@@ -169,21 +300,30 @@ void manageQueue(){
         } 
         // now ck the front of the queue
         cout << "ManageQueue:We woke up. Popping from qeueu\n";
-        auto req = line.front(); // get the top element
+        auto req = line.front(); // get the top element {thingy(AKA the request), connfd}
         line.pop(); // pops the element
         ul.unlock(); // unlock to all the main to push more requests
         cout << "ManageQueue:Unlocked the queue\n";
         // now ck if the request can go
         istringstream iss(req.first); // get the string and make a stringstream
         string requestType; // ck if read or write request
-        getline(iss,requestType,':'); 
+        string seq;
+
+        getline(iss,seq,':'); // read seq number
+        getline(iss,requestType,':');  // read requesttype
+        int sequenceNumber = stoi(seq); //convert seq to int
+
+        bool check = checkSequenceNumber(sequenceNumber,req.second, requestType); // basically ck if we are caught up
         /*---------------------------------
              -- if it's a read type:
                 1. Ck if there's a write
                 2. If yes, sleep until no write
                 3. otherwise, incremenet count and go
+
+            only process these requests if are not catching up
+            if we were catching up, we would already have processed this req
         ------------------------------------*/ 
-        if (requestType == "r"){
+        if (requestType == "r" && check){
             cout << "ManageQueue:Read request\n";
             cout << "Getting write lock\n";
             wl.lock(); // get write lock and increment ur count
@@ -201,15 +341,16 @@ void manageQueue(){
             cout << "ManageQueue:Unlocking both read lock and write lock\n";
 
             // now we are good to handle the request
-            vect.push_back(thread(thefunction,ref(iss),req.second)); // pass stringstream and confd
+            thread t = thread(thefunction,ref(iss),req.second); // pass stringstream and confd
+            t.detach(); // detach itself from main thread/ plus it won't get cleaned up after somehting happens
 
         }
         /*---------------------------------
-          if it's a write  type:
+          else it's a write  type:
             1. Ck the counter, and see if there are any reads
             2. sleep until no reads
         ------------------------------------*/ 
-        else if (requestType == "w"){
+        else if (check){
             cout << "ManageQueue:Write request\n";
             cout << "ManageQueue:Getting write lock\n";
             wl.lock(); // make sure no other write AND READ can access the files
@@ -227,27 +368,21 @@ void manageQueue(){
                 cout << "ManageQueue:Waking up on read signal\n";
  
             } 
-            // while (readCounter != 0){
-            //     // unlock, sleep fir a bit and try again
-            //     readLock.unlock();
-            //     this_thread::sleep_for(chrono::milliseconds(100)); // sleep
-            //     readLock.lock(); // acquire the lock before we access SHARED RESCOURCE
-            // }
+
             isWriteHap = true; // we are writing now
             // unlock the read and write and go
             rl.unlock();
             wl.unlock();
             cout << "ManageQueue:Unlocking both read lock and write lock\n";
-            vect.push_back(thread(thefunction,ref(iss),req.second)); // pass stringstream and confd
+            // if it is equal to w (meaning its from FE, we will multicast AKA we are not replicating)
+            // else the primary multicasted the update to me and i will not multicast
+            thread t = thread(thefunction,ref(iss),req.second); // pass stringstream and confd
+            t.detach(); // detach itself from main thread/ plus it won't get cleaned up after somehting happens
         }
-        else{
-            cerr << "WHAT?";
-            exit(5);
-        }
-
-
+    
      } // end of while loop
 }
+
 
 /*----------------------------------------------------------------------------
     -- This function is is basically ends the request. It sends back mssg to the
@@ -257,11 +392,14 @@ void manageQueue(){
         -- sets isWriteHap to false if type w
     -- @param:
         - output - return mssg
-        - type
+        - type - Whtehr its a read or write command
+        - connfd - if -1, we will simply return because we are catching up, otherwise close connection
 ------------------------------------------------------------------------------*/
 void finishedTask(const string& theoutput, char type, int connfd){
     // if read, decrement counter
     // if read counter is 0, signal doneReading
+    if (connfd == -1) return;
+
     if (type == 'r'){
         cout << "FinishedTask:Getting read lock\n";
         unique_lock<mutex> rl(readLock);
@@ -287,6 +425,13 @@ void finishedTask(const string& theoutput, char type, int connfd){
     // if write, change iswriteHap to false and notify all
     else if (type == 'w'){
         cout << "FinishedTask:Getting write lock\n";
+
+        // update the sequence number and write to the file
+        unique_lock<mutex> sl(sequenceNumberLock); // acquire lock
+        mySeq++;// increment my seq #. 
+        writeSeqNumber();
+
+        // now acquire write lock and set writeHap to false and notifyAll
         unique_lock<mutex> wl(writeLock);
         // if we are the last read, signal and unlock
         isWriteHap = false; // no more writes
@@ -294,6 +439,7 @@ void finishedTask(const string& theoutput, char type, int connfd){
         doneWriting.notify_all(); // we are done writing
         wl.unlock(); // unlock bc we don't need it
         cout << "FinishedTask:unlocking write lock\n";
+
         // everything else is just return the output the user and close connection
         char      buff[MAXLINE]; // used to return the output
         snprintf(buff, sizeof(buff), "%s", theoutput.c_str()); // store the output into the buffer
@@ -320,8 +466,13 @@ void finishedTask(const string& theoutput, char type, int connfd){
     -- The first field is the action the server wants and afyer that the data (most likely the userID or search fields)
 ------------------------------------------------------------------------------*/
 void thefunction(istringstream& iss,int connfd){
+
+    // get whole string which will be used to multicast
+    // string command;
+    // getline(orgIss,command); // this basically reads the whole string
+    // istringstream iss(command); // make a new stringsteam with the command., this way we have the orignal command
+
     string thefunc;
-    // istringstream iss(theinput);
     getline(iss,thefunc,':');
     //cout << "From client: " << theinput << endl;
    //cout << thefunc<<endl;
@@ -330,6 +481,8 @@ void thefunction(istringstream& iss,int connfd){
     char  USERS_FILE [] =  "users_server2.txt";
     char  FRIENDS_FILE [] =  "friends_server2.txt";
 
+    
+
     if(thefunc == "create"){
         string id, name, password;
         getline(iss,id,':');
@@ -337,7 +490,6 @@ void thefunction(istringstream& iss,int connfd){
         getline(iss,password,':');
         string output =  create(id,name,password,TWEET_FILE,USERS_FILE,FRIENDS_FILE); // get output
         finishedTask(output,'w',connfd); // weite
-
     } 
     else if(thefunc == "signin"){ // read
         string id, password;
@@ -418,8 +570,10 @@ void thefunction(istringstream& iss,int connfd){
     else {
         cerr << " ERROR IN THE FUNC";
     }
-
 };
+
+
+
 
 
 

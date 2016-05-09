@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import g
 
 
+
 class CounterWrapper:
   def __init__(self):
     self.counter = 0
@@ -55,7 +56,7 @@ serverports = {13002:0, 13003:0, 13004:0} # list of all serverports and current 
 
 #172.16.30.242:59284
 host = "127.0.0.1"
-port = 13002
+#port = 13002
 #host = "pdc-amd01.poly.edu" # Where do you want to connect
 # host = "pdc-amd01.poly.edu"
 # port = 63099 
@@ -81,11 +82,13 @@ def login_page():
   # If the user sends back a request( either log in or create a new account)
   if request.method == 'POST':
     # ck which type of response it was
+    print "========= new one\n"
     if request.form["submit"] == "Sign In": # user is trying to log into his/her account
       #print request.form["user_name"] #print to the console for debugging purposes
       #communicate with the server, return id
       serveroutput = servercomm("r:signin"+":"+request.form["user_name"]+":"+request.form["password"])
       # ck the credentials
+      print "Printint serveroutput ", serveroutput
       if serveroutput[0] == "invalid":
         return render_template("login.html", responsetext="You entered a invalid username/password")
       elif serveroutput [0] == "success":
@@ -379,6 +382,8 @@ def servercomm(input):
   if isWrite ==1 :
     push_queue(input,flaskSequence)
 
+  serveroutput = "" # used to hold the response
+
   for port,sequenceNum in serverports.iteritems():
     # go through all the ports and multicast
     try:
@@ -389,36 +394,45 @@ def servercomm(input):
         print 'Hostname could not be resolved. Exiting'
         sys.exit()
 
+    try:
+      s = socket.socket() # Create socket object
+      s.settimeout(5) # this is our timeout
+      print "=================== connecting to ",port
 
-    s = socket.socket() # Create socket object
-    s.timeout(5)
-    s.connect((host, port))
-    #print "the input:" + input
-    input = flaskSequence + ":" + input 
-    s.send(input)
-    serveroutput = (s.recv(1024)).split(":")
+      s.connect((host, port))
+      #print "the input:" + input
+      tempInput = str(flaskSequence) + ":" + input # put our seq # in for the flask seq
+      print "input = " + tempInput
+      s.send(tempInput)
+      serveroutput = (s.recv(1024)).split(":")
 
-    # if the server sends back a negative, it is behind the sequence number
-    # serveroutput[1] = the currrent sequence number of the server
-    # send back the queue with all the sequence numbers
-    if serveroutput[0] == "negative" :
-      response = serializedQueue(serveroutput[1],flaskSequence)
-      s.send(response)
+      # if the server sends back a negative, it is behind the sequence number
+      # serveroutput[1] = the currrent sequence number of the server
+      # send back the queue with all the sequence numbers
+      print "============ ",serveroutput
+      if serveroutput[0] == "negative" :
+        print "============ ", serveroutput
+        response = serializedQueue(serveroutput[1],flaskSequence)
+        s.send(response)
+        serverports[port] = flaskSequence # we are updating the vectorClock
+   
 
-    else: # positive 
-      serverports[port] = flaskSequence
+      else: # positive 
+        serverports[port] = flaskSequence # we are updating the vectorClock
 
-    s.close
+      s.close
+    except socket.timeout:
+      print 'Server died '
   return serveroutput
 
 # this gets the sequence number of the server and sends back all the requests
 # from that number to the current flaskSequence number 
 def serializedQueue(serverSequenceNumber,flaskSequence):
-  theQueue = get_queue()
+  theQueue = get_queue() # get the queue from the g variable
   theSerializedQueue = ""
   i = int(serverSequenceNumber)
   while i < flaskSequence :
-    theSerializedQueue = theSerializedQueue + "|" + theQueue[i]
+    theSerializedQueue = theSerializedQueue + "|" + theQueue[i] # append each request to the queue
     i+=1;
   return theSerializedQueue
 

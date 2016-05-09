@@ -49,6 +49,8 @@ using namespace std;
 void thefunction(istringstream& iss,int connfd);
 void manageQueue(); // thread function
 void finishedTask(const string& theoutput, char type, int connfd);
+void readSeqNumber();
+void writeSeqNumber();
 
 // THIS IS FOR CONCURRENCY
 // queue<pair<istringstream,int>> line; // used to manage read/writes
@@ -68,6 +70,7 @@ condition_variable doneSequence; // used tp signal when im done cking seq thingy
 vector<int> serverList = {13002,13003,13004}; // all the servers
 int mySeq;
 bool isReplcating = false; // used to ck if we are multicast
+
 
 
 
@@ -112,7 +115,8 @@ int main(int argc, char **argv) {
         perror("Unable to listen");
         exit(3);
     }
-
+    // read the sequence number from the file
+    readSeqNumber();
     thread bouncer(manageQueue); // bounder for the read/write
     unique_lock<mutex> ql(queueLock,defer_lock); // set up unique lock for queue lock, but dont lock now
     
@@ -156,6 +160,46 @@ int main(int argc, char **argv) {
 }
 
 
+
+/*----------------------------------------------------------------------------
+    -- This function basically reads in the sequence number from the file
+    -- Note no need to acquire locks here because this is before any of the locking
+    -- stuff
+------------------------------------------------------------------------------*/
+void readSeqNumber(){
+
+    ifstream ifs("server1_seq.txt"); // open the file 
+    if (!ifs){
+        cerr << "Can't open file: Server1_seq.txt";
+        exit(0);
+    }
+    ifs >> mySeq; // read the int to the mySeq variable
+    ifs.close();
+}
+
+
+/*----------------------------------------------------------------------------
+    -- This function basically just writes the updated version of seq to the file
+    -- Note. precondition - Must have seqLock before this method is called
+------------------------------------------------------------------------------*/
+void writeSeqNumber(){
+
+    ofstream ofs;
+    ofs.open("server1_seq.txt", ios::trunc); // open the file and overwrite its content
+    if (!ofs){
+        cerr << "Can't open file for writing: Server1_seq.txt";
+        exit(0);
+    }
+
+    ofs<<mySeq; // write the new seq #
+
+    ofs.close();
+
+}
+
+
+
+
 /* This function is uses the queue of requests and updates to the Seq num it should be
 */
 void catchup (istringstream& iss){
@@ -163,16 +207,19 @@ void catchup (istringstream& iss){
 
     // iss = "seq,w,command|seq,w,command|...."
     string request;
-    while(getline(iss,request,'|'){ // for each request 
+    while(getline(iss,request,'|')){ // for each request 
         string sequenceNum, write;
         getline(iss,sequenceNum,':'); // get seq number
         getline(iss,write,':'); // 'w' not needed throw out
-        int sequence = atoi(sequenceNum); 
-        if (mySeq > sequenceNum){ // only call the function if its a later request
+        int sequence = stoi(sequenceNum); 
+        if (mySeq > sequence){ // only call the function if its a later request
             thefunction(iss,-1); // -1 tell func to not respond to connfd number
             mySeq++;
         }
     }
+
+    // write the updated seqNumber to the file
+    writeSeqNumber();  // note we already have the lock when we went in this function
 }
 
 
@@ -181,9 +228,10 @@ void catchup (istringstream& iss){
     process the queue
     call it a day
 */
-void sendNegative(int newSeq, int connfd){
+void sendNegative(int connfd){
     char buff[MAXLINE];
-    snprintf(buff, sizeof(buff), "%s", ("negative").c_str()); // store the output into the buffer
+    string output = "negative";
+    snprintf(buff, sizeof(buff), "%s", output.c_str()); // store the output into the buffer
        // printf(buff);
     int len = strlen(buff);
     if (len != write(connfd, buff, strlen(buff))) {
@@ -193,8 +241,7 @@ void sendNegative(int newSeq, int connfd){
     read(connfd,buff,MAXLINE);
     istringstream iss(buff);
     catchup(iss);
-
-        
+   
 }
 
 
@@ -215,14 +262,14 @@ bool checkSequenceNumber(int newSeq,int connfd, const string& requestType){
 
     unique_lock<mutex> sl(sequenceNumberLock); //get seq # lock
     // basically a check. We dont wanna prcess the past request because we already have done it
-    if (newSeq < sequenceNumber)
+    if (newSeq < mySeq)
         return false;
-    else if (newSeq == sequenceNumber && requestType == "r") // if same seq and r, we good
+    else if (newSeq == mySeq && requestType == "r") // if same seq and r, we good
         return true;
-    else if (sequenceNumber + 1 == newSeq && requestType == "w") // if correct seq & w, we good
+    else if (mySeq + 1 == newSeq && requestType == "w") // if correct seq & w, we good
         return true;
-    else if (sequenceNumber + 1 < newSeq){// we are behind
-        sendNegative(newSeq, connfd);
+    else if (mySeq + 1 < newSeq){// we are behind
+        sendNegative(connfd);
         return false;
     } 
     else
@@ -261,12 +308,13 @@ void manageQueue(){
         istringstream iss(req.first); // get the string and make a stringstream
         string requestType; // ck if read or write request
         string seq;
-
+        cout<< "Parsing the input:" <<req.first;
         getline(iss,seq,':'); // read seq number
         getline(iss,requestType,':');  // read requesttype
-        int sequenceNumber = atoi(seq); //convert seq to int
+        cout<< "Seq # = " << seq;
+        int sequenceNumber = stoi(seq); //convert seq to int
 
-        bool check = checkSequenceNumber(sequence,req.second, requestType); // basically ck if we are caught up
+        bool check = checkSequenceNumber(sequenceNumber,req.second, requestType); // basically ck if we are caught up
         /*---------------------------------
              -- if it's a read type:
                 1. Ck if there's a write
@@ -295,6 +343,7 @@ void manageQueue(){
 
             // now we are good to handle the request
             thread t = thread(thefunction,ref(iss),req.second); // pass stringstream and confd
+            t.detach(); // detach itself from main thread/ plus it won't get cleaned up after somehting happens
 
         }
         /*---------------------------------
@@ -328,79 +377,13 @@ void manageQueue(){
             cout << "ManageQueue:Unlocking both read lock and write lock\n";
             // if it is equal to w (meaning its from FE, we will multicast AKA we are not replicating)
             // else the primary multicasted the update to me and i will not multicast
-            bool replicate = (requestType=="w")? false:true;
-            thread t = thread(thefunction,ref(iss),req.second,replicate); // pass stringstream and confd
+            thread t = thread(thefunction,ref(iss),req.second); // pass stringstream and confd
+            t.detach(); // detach itself from main thread/ plus it won't get cleaned up after somehting happens
         }
-        // else{
-        //     cerr << "WHAT?";
-        //     exit(5);
-        // }
-
-        t.detach(); // detach itself from main thread/ plus it won't get cleaned up after somehting happens
-
-
+    
      } // end of while loop
 }
 
-
-/*----------------------------------------------------------------------------
-    -- This function is is basically replicates the update to every server except me
-------------------------------------------------------------------------------*/
-void replicate(const string& command){
-
-    for (int conn : serverList){
-        openSocket();
-    }
-
-}
-
-
-
-/*----------------------------------------------------------------------------
-    -- This function 
-------------------------------------------------------------------------------*/
-void openSocket(){
-
-    int sockfd, portno, n;
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
-
-    char buffer[256];
-    if (argc < 3) {
-       fprintf(stderr,"usage %s hostname port\n", argv[0]);
-       exit(0);
-    }
-    portno = atoi(argv[2]); // this is our port #
-    sockfd = socket(AF_INET, SOCK_STREAM, 0); // create a socket
-    if (sockfd < 0) 
-        error("ERROR opening socket");
-    server = gethostbyname(argv[1]); // 127.0.0.1
-    if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
-        exit(0);
-    }
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, 
-         (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
-    serv_addr.sin_port = htons(portno);
-    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
-        error("ERROR connecting");
-    printf("Please enter the message: ");
-    bzero(buffer,256);
-    fgets(buffer,255,stdin);
-    n = write(sockfd,buffer,strlen(buffer));
-    if (n < 0) 
-         error("ERROR writing to socket");
-    bzero(buffer,256);
-    n = read(sockfd,buffer,255);
-    if (n < 0) 
-         error("ERROR reading from socket");
-    printf("%s\n",buffer);
-    close(sockfd);
-    return 0;
-}
 
 /*----------------------------------------------------------------------------
     -- This function is is basically ends the request. It sends back mssg to the
@@ -410,9 +393,10 @@ void openSocket(){
         -- sets isWriteHap to false if type w
     -- @param:
         - output - return mssg
-        - type
+        - type - Whtehr its a read or write command
+        - connfd - if -1, we will simply return because we are catching up, otherwise close connection
 ------------------------------------------------------------------------------*/
-void finishedTask(const string& theoutput, char type, int connfd,const string& command = "empty"){
+void finishedTask(const string& theoutput, char type, int connfd){
     // if read, decrement counter
     // if read counter is 0, signal doneReading
     if (connfd == -1) return;
@@ -443,15 +427,12 @@ void finishedTask(const string& theoutput, char type, int connfd,const string& c
     else if (type == 'w'){
         cout << "FinishedTask:Getting write lock\n";
 
-        // only multicast if its not a direct command from FE
-        // if command == empty => implies primary
-        mySeq++;// increment my seq #
+        // update the sequence number and write to the file
+        unique_lock<mutex> sl(sequenceNumberLock); // acquire lock
+        mySeq++;// increment my seq #. 
+        writeSeqNumber();
 
-        if (command != "empty"){
-            command = "replicate:" + mySeq + ":" + command; // type is request and append seq #
-            replicate(command);
-        }
-
+        // now acquire write lock and set writeHap to false and notifyAll
         unique_lock<mutex> wl(writeLock);
         // if we are the last read, signal and unlock
         isWriteHap = false; // no more writes
@@ -459,6 +440,7 @@ void finishedTask(const string& theoutput, char type, int connfd,const string& c
         doneWriting.notify_all(); // we are done writing
         wl.unlock(); // unlock bc we don't need it
         cout << "FinishedTask:unlocking write lock\n";
+
         // everything else is just return the output the user and close connection
         char      buff[MAXLINE]; // used to return the output
         snprintf(buff, sizeof(buff), "%s", theoutput.c_str()); // store the output into the buffer
@@ -467,8 +449,6 @@ void finishedTask(const string& theoutput, char type, int connfd,const string& c
         if (len != write(connfd, buff, strlen(buff))) {
             perror("write to connection failed");
         }
-
-        // before closing, we will multicast 
         
         // 6. Close the connection with the current client and go back
         //    for another.
@@ -486,7 +466,7 @@ void finishedTask(const string& theoutput, char type, int connfd,const string& c
     -- Everything is split by a ':' (Colon)
     -- The first field is the action the server wants and afyer that the data (most likely the userID or search fields)
 ------------------------------------------------------------------------------*/
-void thefunction(istringstream& iss,int connfd,bool replicate = false){
+void thefunction(istringstream& iss,int connfd){
 
     // get whole string which will be used to multicast
     // string command;
@@ -510,8 +490,7 @@ void thefunction(istringstream& iss,int connfd,bool replicate = false){
         getline(iss,name,':');
         getline(iss,password,':');
         string output =  create(id,name,password,TWEET_FILE,USERS_FILE,FRIENDS_FILE); // get output
-        command = thefunc + 
-        finishedTask(output,'w',connfd,command ); // weite
+        finishedTask(output,'w',connfd); // weite
     } 
     else if(thefunc == "signin"){ // read
         string id, password;
@@ -534,7 +513,7 @@ void thefunction(istringstream& iss,int connfd,bool replicate = false){
         getline(iss,timestamp,':'); // this is the timestamp
         writeTweet(id, tweet,timestamp,TWEET_FILE);
         string output =  getTweets(id,TWEET_FILE);
-        finishedTask(output,'w',connfd,command);
+        finishedTask(output,'w',connfd);
 
     } 
     else if(thefunc == "searchPeople"){ // read
@@ -557,7 +536,7 @@ void thefunction(istringstream& iss,int connfd,bool replicate = false){
         string id;
         getline(iss,id);
         deleteAccount(id,TWEET_FILE,USERS_FILE,FRIENDS_FILE);
-        finishedTask("delete happening",'w',connfd,command); // we puut dummy data in for output bc delete doesnt do anything
+        finishedTask("delete happening",'w',connfd); // we puut dummy data in for output bc delete doesnt do anything
     } 
     else if (thefunc == "getFollowing"){ // read
         // get all of my friends
@@ -572,7 +551,7 @@ void thefunction(istringstream& iss,int connfd,bool replicate = false){
         getline(iss,username,':'); // my name
         getline(iss,friendname,':'); // friendname
         string output = unfollow(username,friendname,FRIENDS_FILE);
-        finishedTask(output,'w',connfd,command);
+        finishedTask(output,'w',connfd);
     } 
     else if (thefunc == "follow"){ //write
         string username, personName;
@@ -580,7 +559,7 @@ void thefunction(istringstream& iss,int connfd,bool replicate = false){
         getline(iss,username,':');
         getline(iss,personName,':');
         string output =  follow(username,personName,FRIENDS_FILE);
-        finishedTask(output,'w',connfd,command);
+        finishedTask(output,'w',connfd);
     }
     else if (thefunc == "searchPersonTweet"){ //read
         // we are getting a particular person's tweets

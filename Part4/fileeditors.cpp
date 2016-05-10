@@ -35,7 +35,7 @@ using namespace std;
 
 namespace glitter{
     // Function for Creating new accounts
-    string create(const string& id, const string& username, const string& password){
+    string create(const string& id, const string& username, const string& password, const int port){
         string line, token;
         fstream idfile("users.txt");
         if(!idfile.is_open()){cerr<< "Users.txt file did not open, create failed \n";}
@@ -140,10 +140,13 @@ namespace glitter{
         return "notfound"; // not found
     };
     
-    void writeTweet(const string& id, const string& tweet, const string& timestamp){
+    void writeTweet(const string& id, const string& tweet, const string& timestamp,const int port){
         string str, username;
         char nameOfTweetFile[] = "tweets.txt";
-        char tempTweetFile[] = "tweetstemp.txt"; // tempfile to write into
+
+        char tempTweetFile[18];
+        sprintf(tempTweetFile,"%dtweettemp.txt", port);
+        // char tempTweetFile[] = "tweetstemp.txt"; // tempfile to write into
         
         ifstream in_file(nameOfTweetFile); // Reach from original tweet file
         if(!in_file){ cerr << "Could not open input file for tweets\n";}

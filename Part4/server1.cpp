@@ -233,7 +233,7 @@ void catchup (istringstream& iss){
 void sendNegative(int connfd){
     char buff[MAXLINE];
     memset(buff,0, sizeof buff);
-    string output = "negative:" + mySeq;
+    string output = "negative:"+ to_string(mySeq);
     snprintf(buff, sizeof(buff), "%s", output.c_str()); // store the output into the buffer
     cout << "Printing buff\n";
     printf(buff);
@@ -265,6 +265,7 @@ bool checkSequenceNumber(int newSeq,int connfd, const string& requestType){
 
 
     unique_lock<mutex> sl(sequenceNumberLock); //get seq # lock
+    cout << "myseq = "<<mySeq<<" newSeq = "<<newSeq<<endl;
     // basically a check. We dont wanna prcess the past request because we already have done it
     if (newSeq < mySeq)
         return false;
@@ -312,10 +313,10 @@ void manageQueue(){
         istringstream iss(req.first); // get the string and make a stringstream
         string requestType; // ck if read or write request
         string seq;
-        cout<< "Parsing the input:" <<req.first;
+        //cout<< "Parsing the input:" <<req.first<<endl;
         getline(iss,seq,':'); // read seq number
         getline(iss,requestType,':');  // read requesttype
-        cout<< "Seq # = " << seq;
+        //cout<< "Seq # = " << seq<<endl;
         int sequenceNumber = stoi(seq); //convert seq to int
 
         bool check = checkSequenceNumber(sequenceNumber,req.second, requestType); // basically ck if we are caught up
@@ -517,7 +518,7 @@ void thefunction(istringstream& iss,int connfd){
         getline(iss,id,':');
         getline(iss,tweet,':');
         getline(iss,timestamp,':'); // this is the timestamp
-        writeTweet(id, tweet,timestamp,TWEET_FILE);
+        writeTweet(id, tweet,timestamp,TWEET_FILE,PORT_NUM);
         string output =  getTweets(id,TWEET_FILE);
         finishedTask(output,'w',connfd);
 
@@ -541,7 +542,7 @@ void thefunction(istringstream& iss,int connfd){
     else if(thefunc == "delete"){ //read
         string id;
         getline(iss,id);
-        deleteAccount(id,TWEET_FILE,USERS_FILE,FRIENDS_FILE);
+        deleteAccount(id,TWEET_FILE,USERS_FILE,FRIENDS_FILE,PORT_NUM);
         finishedTask("delete happening",'w',connfd); // we puut dummy data in for output bc delete doesnt do anything
     } 
     else if (thefunc == "getFollowing"){ // read
@@ -556,7 +557,7 @@ void thefunction(istringstream& iss,int connfd){
         string username,friendname; // remove the friend from my friends list
         getline(iss,username,':'); // my name
         getline(iss,friendname,':'); // friendname
-        string output = unfollow(username,friendname,FRIENDS_FILE);
+        string output = unfollow(username,friendname,FRIENDS_FILE,PORT_NUM);
         finishedTask(output,'w',connfd);
     } 
     else if (thefunc == "follow"){ //write
@@ -564,7 +565,7 @@ void thefunction(istringstream& iss,int connfd){
         // get my id and the person i wanna unfollow's id
         getline(iss,username,':');
         getline(iss,personName,':');
-        string output =  follow(username,personName,FRIENDS_FILE);
+        string output =  follow(username,personName,FRIENDS_FILE,PORT_NUM);
         finishedTask(output,'w',connfd);
     }
     else if (thefunc == "searchPersonTweet"){ //read

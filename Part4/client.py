@@ -32,7 +32,9 @@ def get_request_counter(isWrite):
       globalVar =  GlobalWrapper() # if it doesnt exist, create a new globalWrapper and store in the g context
       g.rGlobals = globalVar # store in the global context
       ctx.push()
-  #emp = 
+  test = getattr(g, 'rGlobals', None)
+  if test is None:
+    print "SOMETHING IS FISHY"
   if isWrite : # only increment the counter if its a write request
     globalVar.increment_counter()
   return globalVar.get_counter()
@@ -42,13 +44,22 @@ def push_queue(request,sequenceNum):
   globalVar = getattr(g, 'rGlobals', None)
   if globalVar is None: # if it doesn't exist already
     print("FAILURE, QUIT LIFE")
+    # print 'intializing in get_request_counter'
+    # # ctx = app.app_context()
+    # # globalVar =  GlobalWrapper() # if it doesnt exist, create a new globalWrapper and store in the g context
+    # # g.rGlobals = globalVar # store in the global context
+    # # ctx.push()
   globalVar.push_request(sequenceNum,request)
 
 
-def get_queue(sequenceNum):
+def get_queue():
   globalVar = getattr(g, 'rGlobals', None)
   if globalVar is None: # if it doesn't exist already
     print("FAILURE, QUIT LIFE")
+    # ctx = app.app_context()
+    # globalVar =  GlobalWrapper() # if it doesnt exist, create a new globalWrapper and store in the g context
+    # g.rGlobals = globalVar # store in the global context
+    # ctx.push
   return globalVar.get_queue()
 
 
@@ -60,7 +71,7 @@ userTweets = {} # holds all the tweets of all the users
 listStuff = [] # holds this users tweets
 userFriends = {} # holds all the friends of the user
 
-serverports = {13002:0, 13003:0, 13004:0} # list of all serverports and current sequence number 
+serverports = {13002:0, 13003:0} # list of all serverports and current sequence number 
 
 
 #172.16.30.242:59284
@@ -91,18 +102,19 @@ def login_page():
   # If the user sends back a request( either log in or create a new account)
   if request.method == 'POST':
     # ck which type of response it was
-    print "========= new one\n"
     if request.form["submit"] == "Sign In": # user is trying to log into his/her account
       #print request.form["user_name"] #print to the console for debugging purposes
       #communicate with the server, return id
       serveroutput = servercomm("r:signin"+":"+request.form["user_name"]+":"+request.form["password"])
       # ck the credentials
-      print "Printint serveroutput ", serveroutput
       if serveroutput[0] == "invalid":
         return render_template("login.html", responsetext="You entered a invalid username/password")
       elif serveroutput [0] == "success":
         session['userName'] = request.form["user_name"] # basically a dictionary
         return redirect(url_for("homePage"))
+      else:
+        return render_template("login.html", responsetext="Oops an error occurred. Please try again later :(")
+
 
     elif request.form["submit"] == "create_account":
       return redirect(url_for("create"))  # redirect to the users page
@@ -133,6 +145,8 @@ def create():
       elif serveroutput[0] == 'newaccount':
         session['userName'] = request.form['user_name']
         return redirect(url_for("login_page"))
+      else:
+        return render_template("create.html", responsetext = "An error occurred. Please try again later :(")
   else:
     return render_template("create.html")
 
@@ -191,8 +205,6 @@ def homePage():
             time = datetime.strptime(listStuff[index], "%Y-%m-%d %H %M %S")
             index += 1
             # add it to the list
-            # print mssg
-            # print time
             newList.append((time,mssg))
           newList = newList[::-1] # reverse the list
           #listStuff = listStuff[::-1]# reverse the list to put the latest times in the front
@@ -227,7 +239,7 @@ def homePage():
       while index < len(listStuff):
         mssg = listStuff[index]
         index+=1
-        time = datetime.strptime(listStuff[index], "%Y-%m-%d %H %M %S")
+        time = datetime.strptime(listStuff[index], '%Y-%m-%d %H %M %S')
         index += 1
         # print mssg
         # print time
@@ -335,7 +347,11 @@ def searchPersonTweet():
 # We could also search for a particular person you are following
 @app.route('/following/', methods = ['post','get'])
 def displayMyFollowing():
-  username = session['userName'] # get my username
+  try:
+    username = session['userName']
+  except KeyError: # make sure the user is logged in
+    return redirect(url_for('login_page'))# redirect to the login page
+  #username = session['userName'] # get my username
   if request.method == 'POST':     # we are unfollowing a person
     if request.form['submit'] == 'unfollow': # if it was a unfollow request
       personName = request.form['hidden'].strip('/') # get the persons name
@@ -368,9 +384,6 @@ def displayMyFollowing():
     else:
       return render_template("following.html", error = "There was an error displaying your followers :(")
 
-
-
-
 def checkLogIn():
   #Check if the user is logged in. If not, redirect.
   try:
@@ -387,9 +400,10 @@ def servercomm(input):
     isWrite = 1
   else:
     isWrite = 0
+  #print 'write = ' + str(isWrite)
   flaskSequence = get_request_counter(isWrite); # if read just get num, if write update & get num
   if isWrite ==1:
-    print 'Pushing request in queue'
+    #print 'Pushing request in queue'
     push_queue(input,flaskSequence)
 
   serveroutput = "" # used to hold the response
@@ -412,7 +426,7 @@ def servercomm(input):
       s.connect((host, port))
       #print "the input:" + input
       tempInput = str(flaskSequence) + ":" + input # put our seq # in for the flask seq
-      print "input = " + tempInput
+      #print "input = " + tempInput
       s.send(tempInput)
       tempOutput = (s.recv(1024)).split(":")
 
@@ -421,13 +435,9 @@ def servercomm(input):
       # send back the queue with all the sequence numbers
       #print "============ ",serveroutput
       if tempOutput[0] == "negative" :
-        #print "============ ", serveroutput
-        print 'Inside negative'
         response = serializedQueue(tempOutput[1],flaskSequence)
-        #print "Sending queue back to the server " + response
         s.send(response)
-        serverports[port] = flaskSequence # we are updating the vectorClock
-  
+        serverports[port] = flaskSequence # we are updating the vectorClock  
       else: # positive 
         serverports[port] = flaskSequence # we are updating the vectorClock
         serveroutput = tempOutput
@@ -437,16 +447,36 @@ def servercomm(input):
     except socket.error as serr:
       if serr.errno == errno.ECONNREFUSED:
         print 'Server died'
+    except:
+      return "Failure"
 
   if not serveroutput:
     serveroutput = ["FAILURE"] # if its empty, something was wrong, so display error message
     print 'Setting serveroutput'
+  if  flaskSequence % 10 == 9: # every 9, clear the queue
+    clearQueue()
   return serveroutput
+
+
+
+# This basically clears out the queue once all the servers have seen a message
+# get the smallest sequence and delete all messages before that number
+def clearQueue():
+  i = min(serverports, key=serverports.get) # get minimum vector clock number
+  theQueue = get_queue() # get the queue from the g variable
+  #print 'deleting queue before ', theQueue
+  delete = 0 # index to delete all the elements less than i
+  while delete < i:
+    if delete in theQueue: # ck if the element is in the queue
+      del theQueue[delete] # delete the element
+    delete += 1 # increment delete
+  # 'deleting queue after ', theQueue
+
 
 # this gets the sequence number of the server and sends back all the requests
 # from that number to the current flaskSequence number 
 def serializedQueue(serverSequenceNumber,flaskSequence):
-  theQueue = get_queue(flaskSequence) # get the queue from the g variable
+  theQueue = get_queue() # get the queue from the g variable
   theSerializedQueue = ""
   i = int(serverSequenceNumber)
   while i <= flaskSequence :
@@ -482,6 +512,8 @@ def force():
 
 
 if __name__ == '__main__':
+
   app.secret_key = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT' # this is the key used for the session
   PRESERVE_CONTEXT_ON_EXCEPTION = False
   app.run("127.0.0.1",1300,debug = True)
+  get_request_counter(0) # basically initialize the globals

@@ -80,9 +80,10 @@ string getFollowing(const string& username, const string& personName,const char 
  -- basically removes the friend from the followlist of username
  
  */
-string unfollow(const string& username,const string& personName,const char friendFile []){
+string unfollow(const string& username,const string& personName,const char friendFile [],const int port){
 
-    char nameOfTempFile[] = "temp.txt";
+    char nameOfTempFile[18];
+    sprintf(nameOfTempFile,"%dtweettemp.txt", port);
   //  char nameOfFriendFile[] = friendFile;
     string str, idsInFile;
     string output = "success"; // we will also keep track of our friends so we don't have to reopen the file to find our friends
@@ -195,12 +196,13 @@ string findPeople(const string& myUserName, const string& personName, const char
 
 
 // This method will bascically add the person to the friend vector
-string follow(const string& myUserName, const string& personName,const char friendFile []){
+string follow(const string& myUserName, const string& personName,const char friendFile [],const int port){
 
     // we will read from the input file and store in a temp output file. If we encounter the username, we will simply
     // append it's data to the end of the string
   //  char inputFile [] = friendFile;
-    char outputFile [] = "temp.txt";
+    char outputFile[18];
+    sprintf(outputFile,"%dtweettemp.txt", port);
     ifstream inFile(friendFile);
     if (!inFile){
         cout << "Can't open friends file to follow someone";

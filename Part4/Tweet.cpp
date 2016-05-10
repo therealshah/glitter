@@ -27,6 +27,7 @@ string getTweets(const string& id, const char tweetFile []){
         getline(iss,idOnFile,':'); // get the id of this person
         if (id == idOnFile){
             tweetfile.close(); // close the file
+            cout << "getTweets returns: " << line << endl;
             return "success:" +  line; // we found this person's tweets
         }
     }
@@ -35,10 +36,17 @@ string getTweets(const string& id, const char tweetFile []){
     return "notfound"; // not found
 };
 
-void writeTweet(const string& id, const string& tweet, const string& timestamp,const char tweetFile []){
+void writeTweet(const string& id, const string& tweet, const string& timestamp,const char tweetFile [], const int port){
     string str, username;
     //char nameOfTweetFile[] = tweetFile;
-    char tempTweetFile[] = "tweetstemp.txt"; // tempfile to write into
+
+    // temp tweet file to write into, uses a port number in the name;
+    char tempTweetFile[18];
+    sprintf(tempTweetFile,"%dtweettemp.txt", port);
+    // strcpy (tempTweetFile,atoi(port));
+    // strcat (tempTweetFile,"temp.txt");
+    // char tempTweetFile[] = "tweetstemp.txt"; // tempfile to write into
+
 
     ifstream in_file(tweetFile); // Reach from original tweet file
     if(!in_file){ cerr << "Could not open input file for tweets\n";}

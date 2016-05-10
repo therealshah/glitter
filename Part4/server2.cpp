@@ -517,7 +517,7 @@ void thefunction(istringstream& iss,int connfd){
         getline(iss,id,':');
         getline(iss,tweet,':');
         getline(iss,timestamp,':'); // this is the timestamp
-        writeTweet(id, tweet,timestamp,TWEET_FILE);
+        writeTweet(id, tweet,timestamp,TWEET_FILE,PORT_NUM);
         string output =  getTweets(id,TWEET_FILE);
         finishedTask(output,'w',connfd);
 
@@ -541,7 +541,7 @@ void thefunction(istringstream& iss,int connfd){
     else if(thefunc == "delete"){ //read
         string id;
         getline(iss,id);
-        deleteAccount(id,TWEET_FILE,USERS_FILE,FRIENDS_FILE);
+        deleteAccount(id,TWEET_FILE,USERS_FILE,FRIENDS_FILE,PORT_NUM);
         finishedTask("delete happening",'w',connfd); // we puut dummy data in for output bc delete doesnt do anything
     } 
     else if (thefunc == "getFollowing"){ // read
@@ -556,7 +556,7 @@ void thefunction(istringstream& iss,int connfd){
         string username,friendname; // remove the friend from my friends list
         getline(iss,username,':'); // my name
         getline(iss,friendname,':'); // friendname
-        string output = unfollow(username,friendname,FRIENDS_FILE);
+        string output = unfollow(username,friendname,FRIENDS_FILE,PORT_NUM);
         finishedTask(output,'w',connfd);
     } 
     else if (thefunc == "follow"){ //write
@@ -564,7 +564,7 @@ void thefunction(istringstream& iss,int connfd){
         // get my id and the person i wanna unfollow's id
         getline(iss,username,':');
         getline(iss,personName,':');
-        string output =  follow(username,personName,FRIENDS_FILE);
+        string output =  follow(username,personName,FRIENDS_FILE,PORT_NUM);
         finishedTask(output,'w',connfd);
     }
     else if (thefunc == "searchPersonTweet"){ //read

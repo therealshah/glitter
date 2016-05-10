@@ -30,7 +30,7 @@
      -- basically removes the friend from the followlist of username
      
      */
-    std::string unfollow(const std::string& username,const std::string& personName,const char friendFile []);
+    std::string unfollow(const std::string& username,const std::string& personName,const char friendFile [],const int port);
     
     
     
@@ -39,6 +39,6 @@
     
     
     // This method will bascically add the person to the friend vector
-    std::string follow(const std::string& myUserName, const std::string& personName,const char friendFile []);
+    std::string follow(const std::string& myUserName, const std::string& personName,const char friendFile [],const int port);
 
 #endif

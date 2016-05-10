@@ -16,31 +16,32 @@ using namespace std;
 
 
 // This method deletes the user from all files by calling other methods
-string deleteAccount(const string& id, const char tweetsFile [], const char usersFile [], const char friendFile []){
+string deleteAccount(const string& id, const char tweetsFile [], const char usersFile [], const char friendFile [], const int port){
     // char nameOfTweetFile[] = tweetsFile;
     // char nameOfFriendFile[] = usersFile;
     // char nameOfUserFile[] = friendFile;
 
 
     // Clever use of one function to delete everything from a specific file
-    if(!removeIDfromfile(id, tweetsFile)){
+    if(!removeIDfromfile(id, tweetsFile, port)){
         perror( "Error deleting user from tweets" );
     }
-    if(!removeIDfromfile(id, usersFile)){
+    if(!removeIDfromfile(id, usersFile, port)){
         perror( "Error deleting user from Friend" );
     }
-    if(!removeIDfromfile(id, friendFile)){
+    if(!removeIDfromfile(id, friendFile, port)){
         perror( "Error deleting user from User" );
     }
-    if(!removeIdFromYourFollowers(id,friendFile)){
+    if(!removeIdFromYourFollowers(id,friendFile,port)){
         perror( "Error deleting user from those following" );
     }
     return "successfulDelete";
 }
 
 // This method removes any line that start with the client ID in any file
-bool removeIDfromfile(const string& clientID, const char theFile[]){
-    char nameOfTempFile[] = "temp.txt";
+bool removeIDfromfile(const string& clientID, const char theFile[],const int port){
+    char nameOfTempFile[18];
+    sprintf(nameOfTempFile,"%dtweettemp.txt", port);
     string str, idOnFile;
 
     ifstream in_file(theFile);  // Open the original file to read from
@@ -73,8 +74,9 @@ bool removeIDfromfile(const string& clientID, const char theFile[]){
 // This method removes your ID from everyone following you
 // The file is copied over without any instance of the clientID in parameter
 // A 1 is returned if the process is successful
-bool removeIdFromYourFollowers(const string& clientID,const char friendsFile []){
-    char nameOfTempFile[] = "temp.txt";
+bool removeIdFromYourFollowers(const string& clientID,const char friendsFile [],const int port){
+    char nameOfTempFile[18];
+    sprintf(nameOfTempFile,"%dtweettemp.txt", port);
    // char nameOfFriendFile[] = friendsFile;
     string str, idsInFile;
     

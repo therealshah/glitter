@@ -14,7 +14,7 @@
     // Go through the tweet file, find the id, put the tweets
     std::string getTweets(const std::string& id,const char tweetFile []);
     
-    void writeTweet(const std::string& id, const std::string& tweet, const std::string& timestamp,const char tweetFile []);
+    void writeTweet(const std::string& id, const std::string& tweet, const std::string& timestamp,const char tweetFile [], const int port);
 
     
     

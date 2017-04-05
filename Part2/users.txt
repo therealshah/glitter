@@ -1,4 +1,5 @@
 shah:shah:shah
+adnan:adnan:adnan
 saqib:saqib:saqib
 jimi:jimi:jimi
 zulf:zulf:zulf
